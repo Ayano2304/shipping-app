@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Helper internal: Kirim notifikasi ke semua user LAIN (kecuali sender/pembuat aksi)
 const createNotification = async ({ judul, pesan, tipe, pengirimanId = null, senderUserId = null }) => {

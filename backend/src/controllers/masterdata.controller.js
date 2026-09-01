@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const XLSX = require('xlsx');
-const prisma = new PrismaClient();
 
 // GET /api/masterdata/sounding
 exports.getSoundingTable = async (req, res) => {

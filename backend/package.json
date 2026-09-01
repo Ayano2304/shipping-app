@@ -4,6 +4,8 @@
   "description": "Backend API for CPO Tanker Shipping Calculation App",
   "main": "src/index.js",
   "scripts": {
+    "postinstall": "prisma generate",
+    "build": "prisma generate",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "db:migrate": "npx prisma migrate dev",

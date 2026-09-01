@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // GET /api/lookup/volume?kapalId=1&tinggi=211&point=0.5
 exports.lookupVolume = async (req, res) => {

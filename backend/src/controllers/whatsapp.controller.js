@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { generatePengirimanPDFBuffer } = require('../utils/pdfGenerator');
 const { generatePdfToken } = require('./export.controller');
-const prisma = new PrismaClient();
 
 const toKg = (nilai, satuan) => satuan === 'MT' ? parseFloat(nilai) * 1000 : parseFloat(nilai);
 

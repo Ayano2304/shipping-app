@@ -58,8 +58,15 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server berjalan di http://0.0.0.0:${PORT}`);
-  console.log(`📱 Akses dari HP: http://192.168.1.8:${PORT}/api`);
-  console.log(`📊 Prisma Studio: npx prisma studio`);
-});
+
+// Hanya jalankan app.listen di development (bukan di Vercel serverless)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server berjalan di http://0.0.0.0:${PORT}`);
+    console.log(`📱 Akses dari HP: http://192.168.1.8:${PORT}/api`);
+    console.log(`📊 Prisma Studio: npx prisma studio`);
+  });
+}
+
+// Export untuk Vercel serverless
+module.exports = app;

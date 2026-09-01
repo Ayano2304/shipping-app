@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Hitung berat palka dengan metode Excel (Rounding terpisah Tinggi + Point)
 const hitungBerat = async (kapalId, tinggiCm, point, suhu, faktorKoreksi) => {

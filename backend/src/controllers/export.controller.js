@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { generatePengirimanPDFBuffer } = require('../utils/pdfGenerator');
 const crypto = require('crypto');
-const prisma = new PrismaClient();
 
 const generatePdfToken = (id, createdAt) => {
   const secret = process.env.JWT_SECRET || 'shipping_secret';
