@@ -1,0 +1,49 @@
+const { PrismaClient } = require('@prisma/client');
+const { generatePengirimanPDFBuffer } = require('../utils/pdfGenerator');
+const crypto = require('crypto');
+const prisma = new PrismaClient();
+
+const generatePdfToken = (id, createdAt) => {
+  const secret = process.env.JWT_SECRET || 'shipping_secret';
+  const timestamp = createdAt ? new Date(createdAt).getTime() : 0;
+  return crypto.createHmac('sha256', secret).update(`${id}:${timestamp}`).digest('hex').slice(0, 20);
+};
+
+exports.generatePdfToken = generatePdfToken;
+
+exports.exportPengirimanPDF = async (req, res) => {
+  try {
+    const pengiriman = await prisma.pengiriman.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: {
+        kapal: true,
+        createdBy: { select: { nama: true } },
+        dischargedBy: { select: { nama: true } },
+        dataPalka: { orderBy: [{ tipe: 'asc' }, { urutan: 'asc' }] },
+      },
+    });
+
+    if (!pengiriman) return res.status(404).json({ error: 'Pengiriman tidak ditemukan.' });
+
+    // Jika diakses tanpa auth (public route), validasi signed token untuk mencegah scraping/ID enumeration
+    if (!req.user) {
+      const providedToken = req.query.token;
+      const validToken = generatePdfToken(pengiriman.id, pengiriman.createdAt);
+      if (!providedToken || providedToken !== validToken) {
+        return res.status(403).json({
+          error: 'Akses ditolak. Tautan unduh dokumen PDF tidak valid atau belum diotorisasi.'
+        });
+      }
+    }
+
+    const buffer = await generatePengirimanPDFBuffer(pengiriman);
+    const filename = `Laporan_CPO_${(pengiriman.kapal?.namaKapal || 'Kapal').replace(/\s/g, '_')}_${pengiriman.nomorBl || pengiriman.id}.pdf`;
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.send(buffer);
+  } catch (err) {
+    console.error('Export PDF error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};

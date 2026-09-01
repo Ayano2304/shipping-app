@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Kapal {
+  id            Int             @id @default(autoincrement())
+  namaKapal     String          @unique @map("nama_kapal") @db.VarChar(100)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  densityTable  DensityTable[]
+  pengiriman    Pengiriman[]
+  soundingTable SoundingTable[]
+
+  @@map("kapal")
+}
+
+model User {
+  id                   Int          @id @default(autoincrement())
+  nama                 String       @db.VarChar(100)
+  username             String       @unique @db.VarChar(50)
+  password             String       @db.VarChar(255)
+  role                 Role         @default(PETUGAS)
+  kontakWa             String?      @map("kontak_wa") @db.VarChar(20)
+  createdAt            DateTime     @default(now()) @map("created_at")
+  pengirimanCreated    Pengiriman[] @relation("CreatedBy")
+  pengirimanDischarged Pengiriman[] @relation("DischargedBy")
+  notifikasi           Notifikasi[]
+
+  @@map("users")
+}
+
+model Pengiriman {
+  id               Int         @id @default(autoincrement())
+  kapalId          Int         @map("kapal_id")
+  tanggalBerangkat DateTime?   @map("tanggal_berangkat") @db.Date
+  tanggalSampai    DateTime?   @map("tanggal_sampai") @db.Date
+  nomorBl          String?     @map("nomor_bl") @db.VarChar(100)
+  nilaiBl          Decimal?    @map("nilai_bl") @db.Decimal(15, 3)
+  satuanBl         SatuanBL    @default(MT) @map("satuan_bl")
+  status           Status      @default(DRAFT)
+  createdById      Int         @map("created_by")
+  dischargedById   Int?        @map("discharged_by")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  dataPalka        DataPalka[]
+  createdBy        User        @relation("CreatedBy", fields: [createdById], references: [id])
+  dischargedBy     User?       @relation("DischargedBy", fields: [dischargedById], references: [id])
+  kapal            Kapal       @relation(fields: [kapalId], references: [id])
+
+  @@map("pengiriman")
+}
+
+model DataPalka {
+  id            Int        @id @default(autoincrement())
+  pengirimanId  Int        @map("pengiriman_id")
+  tipe          TipePalka
+  urutan        Int        @default(1)
+  namaPalka     String     @map("nama_palka") @db.VarChar(50)
+  tinggiCm      Int?       @map("tinggi_cm")
+  point         Decimal?   @db.Decimal(5, 2)
+  suhu          Int?
+  faktorKoreksi Decimal    @default(1.0000) @map("faktor_koreksi") @db.Decimal(8, 6)
+  beratHasil    Decimal?   @map("berat_hasil") @db.Decimal(15, 4)
+  density       Decimal?   @db.Decimal(6, 4)
+  volumeLiter   Decimal?   @map("volume_liter") @db.Decimal(15, 4)
+  pengiriman    Pengiriman @relation(fields: [pengirimanId], references: [id], onDelete: Cascade)
+
+  @@map("data_palka")
+}
+
+// Tabel Sounding - Lookup volume berdasarkan tinggi (per kapal)
+model SoundingTable {
+  id          Int      @id @default(autoincrement())
+  kapalId     Int      @map("kapal_id")
+  tinggiCm    Int      @map("tinggi_cm")
+  volumeLiter Decimal  @map("volume_liter") @db.Decimal(12, 4)
+  bedaLiter   Decimal  @default(403) @map("beda_liter") @db.Decimal(8, 4)
+  createdAt   DateTime @default(now()) @map("created_at")
+  kapal       Kapal    @relation(fields: [kapalId], references: [id], onDelete: Cascade)
+
+  @@unique([kapalId, tinggiCm])
+  @@map("sounding_table")
+}
+
+// Tabel Density - Lookup density berdasarkan suhu (per kapal)
+model DensityTable {
+  id        Int      @id @default(autoincrement())
+  kapalId   Int      @map("kapal_id")
+  suhu      Int
+  density   Decimal  @db.Decimal(6, 4)
+  createdAt DateTime @default(now()) @map("created_at")
+  kapal     Kapal    @relation(fields: [kapalId], references: [id], onDelete: Cascade)
+
+  @@unique([kapalId, suhu])
+  @@map("density_table")
+}
+
+// Tabel Kontak WhatsApp
+model KontakWa {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(100)
+  nomorWa   String   @map("nomor_wa") @db.VarChar(50)
+  jabatan   String?  @db.VarChar(100)
+  instansi  String?  @db.VarChar(100)
+  catatan   String?  @db.VarChar(255)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("kontak_wa")
+}
+
+// Tabel Notifikasi Sistem
+model Notifikasi {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  judul        String   @db.VarChar(150)
+  pesan        String   @db.Text
+  tipe         String   @db.VarChar(50)
+  pengirimanId Int?     @map("pengiriman_id")
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifikasi")
+}
+
+// Tabel Template Pesan WhatsApp
+model TemplatePesan {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(100)
+  isi       String   @db.Text
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("template_pesan")
+}
+
+enum Role {
+  ADMIN
+  PETUGAS
+  SURVEYOR
+  VIEWER
+}
+
+enum SatuanBL {
+  MT
+  KG
+}
+
+enum Status {
+  DRAFT
+  DALAM_PERJALANAN
+  SELESAI
+}
+
+enum TipePalka {
+  KEBERANGKATAN
+  KEDATANGAN
+}
