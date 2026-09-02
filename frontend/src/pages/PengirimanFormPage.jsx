@@ -7,6 +7,7 @@ import { hitungTotalBerat, formatAngka, toKg, formatRibuan, parseRibuan } from '
 import PalkaTableInput from '../components/palka/PalkaTableInput'
 import toast from 'react-hot-toast'
 import { Loader2, Save, ArrowLeft, Send, Ship } from 'lucide-react'
+import { useAuthStore } from '../store/authStore'
 
 const defaultRow = (n) => ({
   _id: Math.random().toString(36).slice(2),
@@ -22,6 +23,7 @@ const defaultRow = (n) => ({
 export default function PengirimanFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const isEdit = Boolean(id)
 
   const [kapalList, setKapalList] = useState([])
@@ -43,7 +45,7 @@ export default function PengirimanFormPage() {
       setLoading(true)
       getPengirimanById(id).then(r => {
         const d = r.data
-        if (d.status === 'SELESAI') {
+        if (d.status === 'SELESAI' && user?.role !== 'ADMIN') {
           toast.error('Pengiriman yang sudah selesai tidak dapat diubah.')
           navigate(`/pengiriman/${id}`, { replace: true })
           return

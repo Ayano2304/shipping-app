@@ -35,12 +35,13 @@ export default function PengirimanKedatanganPage() {
     getPengirimanById(id)
       .then(res => {
         const d = res.data
-        if (d.status === 'SELESAI') {
-          toast.error('Pengiriman ini telah selesai.')
+        const datangPalkaList = d.dataPalka ? d.dataPalka.filter(p => p.tipe === 'KEDATANGAN') : []
+        if (d.status === 'SELESAI' && datangPalkaList.length > 0 && user?.role !== 'ADMIN') {
+          toast.error('Pengiriman ini telah selesai dan dikunci.')
           navigate(`/pengiriman/${id}`, { replace: true })
           return
         }
-        if (user?.role === 'PETUGAS' && d.createdById === user?.id) {
+        if (user?.role === 'PETUGAS' && d.createdById === user?.id && user?.role !== 'ADMIN') {
           toast.error('Sebagai petugas pelabuhan muat, Anda tidak dapat menginput sounding kedatangan.')
           navigate(`/pengiriman/${id}`, { replace: true })
           return
@@ -96,13 +97,7 @@ export default function PengirimanKedatanganPage() {
 
     setSaving(true)
     try {
-      // Update pengiriman status to SELESAI and set tanggalSampai
-      await updatePengiriman(id, {
-        tanggalSampai: tanggalSampai,
-        status: 'SELESAI',
-      })
-
-      // Simpan palka kedatangan
+      // 1. Simpan palka kedatangan terlebih dahulu
       await savePalkaBatch({
         pengirimanId: id,
         tipe: 'KEDATANGAN',
@@ -115,6 +110,12 @@ export default function PengirimanKedatanganPage() {
           point: p.point !== '' && p.point !== null && p.point !== undefined ? p.point : null,
           suhu: p.suhu || null,
         })),
+      })
+
+      // 2. Setelah palka sukses tersimpan, baru update status pengiriman ke SELESAI
+      await updatePengiriman(id, {
+        tanggalSampai: tanggalSampai,
+        status: 'SELESAI',
       })
 
       toast.success('Data kedatangan berhasil disimpan! Pengiriman selesai.')

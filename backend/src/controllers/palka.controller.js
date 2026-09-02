@@ -70,8 +70,12 @@ exports.saveBatch = async (req, res) => {
     });
     if (!pengiriman) return res.status(404).json({ error: 'Pengiriman tidak ditemukan.' });
 
-    // Integritas data: Jangan izinkan modifikasi sounding jika pengiriman sudah SELESAI
-    if (pengiriman.status === 'SELESAI' && req.user.role !== 'ADMIN') {
+    // Integritas data: Jangan izinkan modifikasi sounding jika pengiriman sudah SELESAI kecuali ADMIN atau jika data kedatangan belum ada
+    const existingKedatanganCount = await prisma.dataPalka.count({
+      where: { pengirimanId: parseInt(pengirimanId), tipe: 'KEDATANGAN' }
+    });
+
+    if (pengiriman.status === 'SELESAI' && req.user.role !== 'ADMIN' && existingKedatanganCount > 0) {
       return res.status(403).json({
         error: 'Data sounding pengiriman ini telah dikunci karena status sudah SELESAI. Hanya Admin yang dapat merevisi.'
       });
@@ -80,7 +84,7 @@ exports.saveBatch = async (req, res) => {
     let kapalId = req.body.kapalId || pengiriman.kapalId;
 
     if (tipe.toUpperCase() === 'KEDATANGAN') {
-      if (req.user.role === 'PETUGAS' && pengiriman.createdById === req.user.id) {
+      if (req.user.role === 'PETUGAS' && pengiriman.createdById === req.user.id && req.user.role !== 'ADMIN') {
         return res.status(403).json({
           error: 'Sebagai petugas pelabuhan muat, Anda tidak dapat menginput sounding kedatangan. Sounding kedatangan harus diinput oleh Petugas Pelabuhan Tujuan atau Admin.'
         });

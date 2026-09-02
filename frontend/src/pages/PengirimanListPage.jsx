@@ -262,15 +262,15 @@ export default function PengirimanListPage() {
                             </Link>
                           ) : (
                             <>
-                              {/* Jika sedang berlayar, tombol utama adalah INPUT KEDATANGAN bagi petugas tujuan atau admin */}
-                              {p.status === 'DALAM_PERJALANAN' && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id !== p.createdById)) && (
+                              {/* Tombol INPUT KEDATANGAN */}
+                              {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id !== p.createdById)) && (
                                 <button
                                   onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
                                   title="Input Sounding Kedatangan"
                                 >
                                   <Anchor size={13} />
-                                  <span>Input Kedatangan</span>
+                                  <span>Kedatangan</span>
                                 </button>
                               )}
 
@@ -282,11 +282,11 @@ export default function PengirimanListPage() {
                                 <Eye size={14} />
                               </button>
                               
-                              {p.status !== 'SELESAI' && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id === p.createdById)) && (
+                              {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id === p.createdById)) && (
                                 <button
                                   onClick={() => navigate(`/pengiriman/${p.id}/edit`)}
                                   className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-all shadow-xs"
-                                  title="Edit Data Keberangkatan"
+                                  title="Edit Data"
                                 >
                                   <Pencil size={14} />
                                 </button>
@@ -345,18 +345,18 @@ export default function PengirimanListPage() {
                     ) : (
                       <>
                         <div>
-                          {p.status === 'DALAM_PERJALANAN' && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id !== p.createdById)) && (
+                          {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id !== p.createdById)) && (
                             <button
                               onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
                               className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs font-semibold shadow-sm"
                             >
-                              <Anchor size={13} /> <span>Input Kedatangan</span>
+                              <Anchor size={13} /> <span>Kedatangan</span>
                             </button>
                           )}
                         </div>
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => navigate(`/pengiriman/${p.id}`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-foreground"><Eye size={14} /></button>
-                          {p.status !== 'SELESAI' && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id === p.createdById)) && (
+                          {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id === p.createdById)) && (
                             <button onClick={() => navigate(`/pengiriman/${p.id}/edit`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-amber-500"><Pencil size={14} /></button>
                           )}
                           {user?.role === 'ADMIN' && (
