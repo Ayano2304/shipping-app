@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 const { generatePengirimanPDFBuffer } = require('../utils/pdfGenerator');
-const { generatePdfToken } = require('./export.controller');
+const { generatePdfToken, generateReportSlug } = require('./export.controller');
 
 const toKg = (nilai, satuan) => satuan === 'MT' ? parseFloat(nilai) * 1000 : parseFloat(nilai);
 
@@ -318,8 +318,8 @@ exports.kirimLaporan = async (req, res) => {
     const host = req.get('host');
     const protocol = req.protocol;
     const backendUrl = process.env.PUBLIC_BACKEND_URL || `${protocol}://${host}`;
-    const pdfToken = generatePdfToken(pengiriman.id, pengiriman.createdAt);
-    const pdfDownloadUrl = `${backendUrl}/api/export/public/pdf/${pengiriman.id}?token=${pdfToken}`;
+    const reportSlug = generateReportSlug(pengiriman);
+    const pdfDownloadUrl = `${backendUrl}/report/${reportSlug}`;
 
     // Gunakan pesanCustom jika dikirimkan oleh user, jika tidak gunakan generatePesanWA default
     const pesan = (pesanCustom && pesanCustom.trim())

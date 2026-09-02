@@ -180,8 +180,15 @@ export default function PengirimanDetailPage() {
   // Dictionary Variabel Dinamis untuk Template WhatsApp
   const buildVariables = () => {
     if (!data) return {}
-    const apiBase = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
-    const pdfUrl = `${apiBase}/export/public/pdf/${data.id}`
+    const getCleanReportUrl = () => {
+      if (data.reportUrl) return data.reportUrl
+      const apiBase = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
+      const rootBackendUrl = apiBase.replace(/\/api\/?$/, '')
+      if (data.reportSlug) return `${rootBackendUrl}/report/${data.reportSlug}`
+      const kapalSlug = (data.kapal?.namaKapal || 'KAPAL').trim().replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').toUpperCase()
+      return `${rootBackendUrl}/report/${kapalSlug}-${data.id}`
+    }
+    const pdfUrl = getCleanReportUrl()
     return {
       namaKapal: data.kapal?.namaKapal || '—',
       nomorBl: data.nomorBl || '—',
@@ -198,7 +205,7 @@ export default function PengirimanDetailPage() {
       tglTiba: data.tanggalSampai ? formatTanggal(data.tanggalSampai) : '—',
       petugasMuat: data.createdBy?.nama || '—',
       petugasBongkar: data.dischargedBy?.nama || '—',
-      linkPdf: `*DOKUMEN LAPORAN RESMI (PDF)*\nUnduh/Buka PDF Langsung:\n${pdfUrl}`
+      linkPdf: `*DOKUMEN LAPORAN RESMI (PDF)*\nUnduh/Buka Dokumen:\n${pdfUrl}`
     }
   }
 
@@ -345,29 +352,6 @@ export default function PengirimanDetailPage() {
     } catch (err) {
       toast.error(err.response?.data?.error || 'Gagal mengirim laporan WhatsApp.')
     } finally { setWaSending(false) }
-  }
-
-  const handleOpenWhatsAppDirect = () => {
-    if (!waTarget) {
-      toast.error('Nomor tujuan WhatsApp harus diisi.')
-      return
-    }
-    if (!pesanTeks.trim()) {
-      toast.error('Isi pesan teks tidak boleh kosong.')
-      return
-    }
-
-    let cleanPhone = waTarget.replace(/[^0-9]/g, '')
-    if (cleanPhone.startsWith('08')) {
-      cleanPhone = '628' + cleanPhone.slice(2)
-    } else if (cleanPhone.startsWith('8')) {
-      cleanPhone = '628' + cleanPhone.slice(1)
-    }
-
-    const encodedMsg = encodeURIComponent(pesanTeks.trim())
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`
-    window.open(waUrl, '_blank')
-    setWaModal(false)
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 size={32} className="animate-spin text-primary" /></div>
@@ -1010,37 +994,23 @@ export default function PengirimanDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-border">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => { setWaModal(false); setWaTarget(''); setSelectedContactId('') }}
-                className="px-4 py-2.5 border border-border rounded-xl text-xs font-semibold text-foreground hover:bg-secondary text-center order-3 sm:order-1"
+                className="px-4 py-2.5 border border-border rounded-xl text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer"
               >
                 Batal
               </button>
-              
-              <div className="flex items-center gap-2 order-1 sm:order-2 flex-1 sm:flex-initial justify-end">
-                <button
-                  type="button"
-                  onClick={handleOpenWhatsAppDirect}
-                  disabled={!waTarget || !pesanTeks.trim()}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-secondary hover:bg-secondary/80 border border-border text-foreground rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 active:scale-95"
-                  title="Buka langsung di aplikasi WhatsApp (Gratis)"
-                >
-                  <MessageCircle size={14} className="text-emerald-500" />
-                  <span>Buka di WhatsApp</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleKirimWA}
-                  disabled={waSending || !waTarget || !pesanTeks.trim()}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-green-600/20 transition-all cursor-pointer active:scale-95"
-                  title="Kirim otomatis menggunakan Fonnte API"
-                >
-                  {waSending ? <Loader2 size={14} className="animate-spin" /> : <MessageCircle size={15} />}
-                  <span>{waSending ? 'Mengirim...' : 'Kirim via Fonnte'}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleKirimWA}
+                disabled={waSending || !waTarget || !pesanTeks.trim()}
+                className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-green-600/20 transition-all cursor-pointer active:scale-95"
+              >
+                {waSending ? <Loader2 size={14} className="animate-spin" /> : <MessageCircle size={15} />}
+                <span>{waSending ? 'Mengirim...' : 'Kirim via WhatsApp'}</span>
+              </button>
             </div>
           </div>
         </div>

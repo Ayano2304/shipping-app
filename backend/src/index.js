@@ -43,6 +43,10 @@ app.use('/api/lookup', require('./routes/lookup.routes'));
 app.use('/api/masterdata', require('./routes/masterdata.routes'));
 app.use('/api/notifikasi', require('./routes/notifikasi.routes'));
 
+// Clean Public Document Route: /report/HK-III-20-a8f93e7c1b
+app.get('/report/:slug', require('./controllers/export.controller').exportPublicReportBySlug);
+app.get('/api/report/:slug', require('./controllers/export.controller').exportPublicReportBySlug);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

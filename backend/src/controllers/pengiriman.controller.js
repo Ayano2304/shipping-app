@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma');
 const { createNotification } = require('./notifikasi.controller');
+const { generateReportSlug } = require('./export.controller');
 
 exports.getAll = async (req, res) => {
   try {
@@ -88,9 +89,17 @@ exports.getById = async (req, res) => {
       })
     );
 
+    const reportSlug = generateReportSlug(pengiriman);
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const backendUrl = process.env.PUBLIC_BACKEND_URL || `${protocol}://${host}`;
+    const reportUrl = `${backendUrl}/report/${reportSlug}`;
+
     res.json({
       ...pengiriman,
       dataPalka: enrichedPalka,
+      reportSlug,
+      reportUrl,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
