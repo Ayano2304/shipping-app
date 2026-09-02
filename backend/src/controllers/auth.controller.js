@@ -2,11 +2,49 @@ const prisma = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const verifyTurnstile = async (token, remoteIp) => {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) return true; // Bypass jika belum dikonfigurasi
+  if (!token) return false;
+
+  try {
+    const formData = new URLSearchParams();
+    formData.append('secret', secret);
+    formData.append('response', token);
+    if (remoteIp) {
+      const cleanIp = remoteIp.split(',')[0].trim();
+      formData.append('remoteip', cleanIp);
+    }
+
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
+    });
+    const outcome = await response.json();
+    return !!outcome.success;
+  } catch (err) {
+    console.error('Turnstile verification error:', err);
+    return false;
+  }
+};
+
 exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, captchaToken } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: 'Username dan password wajib diisi.' });
+    }
+
+    // Verifikasi Keamanan Cloudflare Turnstile
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+      const isValidCaptcha = await verifyTurnstile(captchaToken, ip);
+      if (!isValidCaptcha) {
+        return res.status(400).json({
+          error: 'Verifikasi keamanan (CAPTCHA) gagal. Pastikan verifikasi Cloudflare Turnstile berhasil sebelum login.'
+        });
+      }
     }
 
     const user = await prisma.user.findUnique({ where: { username } });
@@ -30,7 +68,7 @@ exports.login = async (req, res) => {
       user: { id: user.id, nama: user.nama, username: user.username, role: user.role, kontakWa: user.kontakWa }
     });
   } catch (err) {
-    console.error(err);
+    console.error('Login error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

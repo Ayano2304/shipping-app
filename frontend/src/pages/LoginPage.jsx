@@ -5,20 +5,32 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import toast from 'react-hot-toast'
 import { Anchor, Eye, EyeOff, Loader2, Sun, Moon } from 'lucide-react'
+import { Turnstile } from '@marsidev/react-turnstile'
 
 export default function LoginPage() {
   const [form, setForm] = useState({ username: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
   const { setAuth } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
   const navigate = useNavigate()
 
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAElDaDEfccS-7If-'
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (turnstileSiteKey && !captchaToken) {
+      toast.error('Silakan selesaikan verifikasi keamanan (CAPTCHA) terlebih dahulu.')
+      return
+    }
+
     setLoading(true)
     try {
-      const { data } = await login(form)
+      const { data } = await login({
+        ...form,
+        captchaToken,
+      })
       setAuth(data.token, data.user)
       toast.success(`Selamat datang, ${data.user.nama}!`)
       navigate('/dashboard')
@@ -112,10 +124,25 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Cloudflare Turnstile CAPTCHA */}
+            {turnstileSiteKey && (
+              <div className="flex justify-center py-1">
+                <Turnstile
+                  siteKey={turnstileSiteKey}
+                  onSuccess={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken('')}
+                  options={{
+                    theme: theme === 'dark' ? 'dark' : 'light',
+                    size: 'normal',
+                  }}
+                />
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full h-10 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+              disabled={loading || (turnstileSiteKey && !captchaToken)}
+              className="w-full h-10 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 cursor-pointer"
             >
               {loading ? <><Loader2 size={16} className="animate-spin" /> Memproses...</> : 'Masuk'}
             </button>
