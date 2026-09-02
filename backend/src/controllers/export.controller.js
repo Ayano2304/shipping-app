@@ -12,8 +12,11 @@ exports.generatePdfToken = generatePdfToken;
 
 exports.exportPengirimanPDF = async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: 'ID pengiriman tidak valid.' });
+
     const pengiriman = await prisma.pengiriman.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       include: {
         kapal: true,
         createdBy: { select: { nama: true } },
@@ -22,24 +25,13 @@ exports.exportPengirimanPDF = async (req, res) => {
       },
     });
 
-    if (!pengiriman) return res.status(404).json({ error: 'Pengiriman tidak ditemukan.' });
-
-    // Jika diakses tanpa auth (public route), validasi signed token untuk mencegah scraping/ID enumeration
-    if (!req.user) {
-      const providedToken = req.query.token;
-      const validToken = generatePdfToken(pengiriman.id, pengiriman.createdAt);
-      if (!providedToken || providedToken !== validToken) {
-        return res.status(403).json({
-          error: 'Akses ditolak. Tautan unduh dokumen PDF tidak valid atau belum diotorisasi.'
-        });
-      }
-    }
+    if (!pengiriman) return res.status(404).json({ error: 'Dokumen pengiriman tidak ditemukan.' });
 
     const buffer = await generatePengirimanPDFBuffer(pengiriman);
     const filename = `Laporan_CPO_${(pengiriman.kapal?.namaKapal || 'Kapal').replace(/\s/g, '_')}_${pengiriman.nomorBl || pengiriman.id}.pdf`;
 
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.send(buffer);
   } catch (err) {
     console.error('Export PDF error:', err);
