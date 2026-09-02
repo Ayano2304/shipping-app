@@ -12,7 +12,7 @@ import {
   ArrowLeft, FileText, MessageCircle, Pencil, Loader2,
   Anchor, Ship, Info, Contact, Phone, Scale, TrendingUp,
   TrendingDown, Thermometer, CheckCircle2,
-  Bookmark, Sparkles, Plus, RotateCcw, Trash2, Clock
+  Bookmark, Sparkles, Plus, RotateCcw, Trash2, Clock, X
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 
@@ -732,15 +732,23 @@ export default function PengirimanDetailPage() {
           <div className="relative bg-card border border-border rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[92vh] overflow-y-auto shadow-2xl animate-fade-in space-y-3.5 sm:space-y-4">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-green-500/15 text-green-600 flex items-center justify-center shrink-0">
                   <MessageCircle size={20} />
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base text-foreground">Kirim Laporan via WhatsApp</h3>
-                  <p className="text-xs text-muted-foreground">Sesuaikan teks pesan secara manual atau gunakan template pesan tersimpan</p>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm sm:text-base text-foreground truncate">Kirim Laporan via WhatsApp</h3>
+                  <p className="text-xs text-muted-foreground truncate sm:whitespace-normal">Sesuaikan teks pesan secara manual atau gunakan template pesan tersimpan</p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => { setWaModal(false); setWaTarget(''); setSelectedContactId('') }}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shrink-0 ml-2 cursor-pointer"
+                title="Tutup Modal"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {/* Section 1: Pilihan Kontak & Nomor WA */}
