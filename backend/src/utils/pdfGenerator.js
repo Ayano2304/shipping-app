@@ -131,34 +131,79 @@ exports.generatePengirimanPDFBuffer = (pengiriman) => {
         renderPalkaTable('2. SFBD (Sounding Figure Before Discharge — Muatan Tujuan)', kedatangan, totalDatang, 'TOTAL SFBD (BONGKAR)');
       }
 
-      // Summary Analysis Card (Left aligned title with clean gap)
+      // 3. ANALISA RASIO SUSUT
       doc.x = 40;
-      doc.fillColor('#1e293b').fontSize(10.5).font('Helvetica-Bold').text('3. Analisa Rasio Susut (R1, R2, R3)', 40, doc.y);
+      doc.fillColor('#1e293b').fontSize(10.5).font('Helvetica-Bold').text('3. ANALISA RASIO SUSUT', 40, doc.y);
       doc.moveDown(0.4);
 
-      const sumBoxTop = doc.y;
-      doc.rect(40, sumBoxTop, 515, 75).fillAndStroke('#f8fafc', '#cbd5e1');
-      doc.fillColor('#0f172a').fontSize(9).font('Helvetica');
+      const formatSignKg = (n) => {
+        if (n === null || n === undefined) return '-';
+        if (n > 0) return `+${formatAngka(n, 0)} KG`;
+        if (n < 0) return `${formatAngka(n, 0)} KG`;
+        return '0 KG';
+      };
 
-      const sign = (n) => n > 0 ? `+${formatAngka(n, 0)}` : formatAngka(n, 0);
-      const signPct = (n) => n > 0 ? `+${n.toFixed(4)}%` : `${n.toFixed(4)}%`;
+      const formatSignPct = (pct) => {
+        if (pct === null || pct === undefined) return '-';
+        if (pct > 0) return `+${pct.toFixed(4)} %`;
+        if (pct < 0) return `${pct.toFixed(4)} %`;
+        return '0.0000 %';
+      };
 
-      doc.font('Helvetica-Bold').text('R1: SFAL vs B/L', 50, sumBoxTop + 10);
-      doc.font('Helvetica').text(`Selisih: ${sign(diffR1)} KG | Rasio: ${signPct(r1Pct)}`, 50, sumBoxTop + 24);
+      const renderRatioBox = (title, selisihText, rasioText) => {
+        // Cek apakah sisa halaman cukup untuk 1 box (50pt) + buffer
+        if (doc.y + 54 > 800) {
+          doc.addPage();
+        }
 
-      doc.font('Helvetica-Bold').text('R2: Susut Pelayaran (SFBD vs SFAL)', 50, sumBoxTop + 42);
-      if (isArrived) {
-        doc.font('Helvetica').text(`Susut: ${sign(diffR2)} KG | Persentase: ${signPct(r2Pct)}`, 50, sumBoxTop + 56);
-      } else {
-        doc.font('Helvetica').text('Status: Menunggu Tiba (Kapal Dalam Pelayaran)', 50, sumBoxTop + 56);
-      }
+        const boxY = doc.y;
+        const boxWidth = 515;
+        const headerHeight = 19;
+        const bodyHeight = 31;
+        const totalHeight = headerHeight + bodyHeight;
 
-      doc.font('Helvetica-Bold').text('R3: SFBD vs B/L', 310, sumBoxTop + 10);
-      if (isArrived) {
-        doc.font('Helvetica').text(`Selisih: ${sign(diffR3)} KG | Rasio: ${signPct(r3Pct)}`, 310, sumBoxTop + 24);
-      } else {
-        doc.font('Helvetica').text('Status: Menunggu Tiba', 310, sumBoxTop + 24);
-      }
+        // Header Box
+        doc.rect(40, boxY, boxWidth, headerHeight).fillAndStroke('#f1f5f9', '#cbd5e1');
+        doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text(title, 50, boxY + 5.5, {
+          width: boxWidth - 20,
+          align: 'left'
+        });
+
+        // Body Box
+        doc.rect(40, boxY + headerHeight, boxWidth, bodyHeight).fillAndStroke('#ffffff', '#cbd5e1');
+
+        // Line 1: Selisih Muatan
+        doc.fillColor('#475569').font('Helvetica').fontSize(8.5).text('Selisih Muatan', 50, boxY + headerHeight + 6);
+        doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text(`:  ${selisihText}`, 145, boxY + headerHeight + 6);
+
+        // Line 2: Rasio
+        doc.fillColor('#475569').font('Helvetica').fontSize(8.5).text('Rasio', 50, boxY + headerHeight + 18);
+        doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8.5).text(`:  ${rasioText}`, 145, boxY + headerHeight + 18);
+
+        // Update Y cursor for next box with 7pt gap
+        doc.y = boxY + totalHeight + 7;
+      };
+
+      // Box R1
+      renderRatioBox(
+        'R1 - PERBANDINGAN SFAL TERHADAP BILL OF LADING',
+        formatSignKg(diffR1),
+        formatSignPct(r1Pct)
+      );
+
+      // Box R2
+      renderRatioBox(
+        'R2 - SUSUT PELAYARAN',
+        isArrived ? formatSignKg(diffR2) : 'Menunggu Tiba (Kapal Dalam Pelayaran)',
+        isArrived ? formatSignPct(r2Pct) : 'Menunggu Tiba'
+      );
+
+      // Box R3
+      renderRatioBox(
+        'R3 - HASIL AKHIR TERHADAP BILL OF LADING',
+        isArrived ? formatSignKg(diffR3) : 'Menunggu Tiba',
+        isArrived ? formatSignPct(r3Pct) : 'Menunggu Tiba'
+      );
 
       // Selesai (Tanpa kolom tanda tangan)
       doc.end();
