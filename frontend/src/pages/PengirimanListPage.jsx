@@ -112,21 +112,11 @@ export default function PengirimanListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border/80 p-5 rounded-2xl shadow-xs">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-              {isViewer ? 'Monitoring Muatan Kapal' : 'Riwayat Pengiriman & Logistik'}
-            </h2>
-            {isViewer && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800">
-                <ShieldCheck size={13} className="text-indigo-600 dark:text-indigo-400" />
-                <span>Auditor View</span>
-              </span>
-            )}
-          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+            Riwayat Pengiriman & Logistik
+          </h2>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            {isViewer
-              ? `Memantau ${total} data logistik muatan CPO Tanker, sounding, dan rasio susut.`
-              : `${total} data pengiriman kapal ditemukan dalam sistem.`}
+            {total} data pengiriman kapal ditemukan dalam sistem.
           </p>
         </div>
 

@@ -109,21 +109,11 @@ export default function DashboardPage() {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border/80 p-5 rounded-2xl shadow-xs">
         <div className="min-w-0">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-              {isViewer ? 'Monitoring & Dashboard Eksekutif' : 'Dashboard Operasional'}
-            </h2>
-            {isViewer && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800">
-                <ShieldCheck size={13} className="text-indigo-600 dark:text-indigo-400" />
-                <span>Auditor / Viewer View</span>
-              </span>
-            )}
-          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+            Dashboard Operasional
+          </h2>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            {isViewer
-              ? 'Pantau pergerakan armada kapal CPO, distribusi muatan, dan rasio susut secara komprehensif.'
-              : 'Ringkasan statistik dan aktivitas sounding muatan kapal CPO Tanker.'}
+            Ringkasan statistik dan aktivitas sounding muatan kapal CPO Tanker.
           </p>
         </div>
 
@@ -133,15 +123,6 @@ export default function DashboardPage() {
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-xs sm:text-sm font-semibold hover:opacity-90 transition shadow-md shadow-primary/20 self-start sm:self-auto shrink-0 cursor-pointer"
           >
             <Plus size={16} /> <span>Pengiriman Baru</span>
-          </Link>
-        )}
-
-        {isViewer && (
-          <Link
-            to="/pengiriman"
-            className="flex items-center gap-2 px-4 py-2.5 border border-border bg-secondary/60 hover:bg-secondary text-foreground rounded-xl text-xs sm:text-sm font-semibold transition shadow-xs self-start sm:self-auto shrink-0"
-          >
-            <Ship size={15} /> <span>Lihat Semua Muatan</span>
           </Link>
         )}
       </div>
