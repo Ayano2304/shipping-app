@@ -108,6 +108,10 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    if (req.user.role === 'SURVEYOR') {
+      return res.status(403).json({ error: 'Sebagai Surveyor Bongkar, Anda tidak berwenang membuat pengiriman baru. Pengiriman baru hanya dapat dibuat oleh Petugas Muat atau Admin.' });
+    }
+
     const { kapalId, tanggalBerangkat, tanggalSampai, nomorBl, nilaiBl, satuanBl, status } = req.body;
     if (!kapalId) return res.status(400).json({ error: 'Kapal wajib dipilih.' });
     const statusFinal = status || 'DRAFT';
@@ -166,6 +170,20 @@ exports.update = async (req, res) => {
     }
 
     const { kapalId, tanggalBerangkat, tanggalSampai, nomorBl, nilaiBl, satuanBl, status } = req.body;
+
+    // Jika role PETUGAS, tidak boleh mengubah status menjadi SELESAI (hanya Surveyor atau Admin)
+    if (req.user.role === 'PETUGAS' && status === 'SELESAI') {
+      return res.status(403).json({
+        error: 'Sebagai Petugas Muat, Anda tidak berwenang menyelesaikan pengiriman. Penyelesaian kedatangan muatan hanya dapat dilakukan oleh Surveyor Bongkar atau Admin.'
+      });
+    }
+
+    // Jika role SURVEYOR, tidak boleh mengedit data B/L atau kapal (hanya tanggalSampai & status)
+    if (req.user.role === 'SURVEYOR' && (kapalId || tanggalBerangkat || nomorBl !== undefined || nilaiBl !== undefined || satuanBl)) {
+      return res.status(403).json({
+        error: 'Sebagai Surveyor Bongkar, Anda hanya berwenang menginput data kedatangan dan tanggal tiba, bukan data B/L atau kapal.'
+      });
+    }
     const pengiriman = await prisma.pengiriman.update({
       where: { id: parseInt(req.params.id) },
       data: {

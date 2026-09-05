@@ -6,7 +6,7 @@ const roleGuard = require('../middleware/roleGuard');
 
 router.get('/', auth, pengirimanController.getAll);
 router.get('/:id', auth, pengirimanController.getById);
-router.post('/', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), pengirimanController.create);
+router.post('/', auth, roleGuard('ADMIN', 'PETUGAS'), pengirimanController.create);
 router.put('/:id', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), pengirimanController.update);
 router.delete('/:id', auth, roleGuard('ADMIN'), pengirimanController.remove);
 

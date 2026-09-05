@@ -190,8 +190,8 @@ export default function UsersPage() {
                   onChange={(val) => setForm(f => ({ ...f, role: val }))}
                   options={[
                     { value: 'ADMIN', label: 'Administrator (Akses Penuh)', icon: Shield },
-                    { value: 'PETUGAS', label: 'Petugas Sounding (Muat & Bongkar)', icon: HardHat },
-                    { value: 'SURVEYOR', label: 'Surveyor Muatan (Sounding)', icon: UserCheck },
+                    { value: 'PETUGAS', label: 'Petugas Muat (Input Keberangkatan / SFAL)', icon: HardHat },
+                    { value: 'SURVEYOR', label: 'Surveyor Bongkar (Input Kedatangan / SFBD)', icon: UserCheck },
                     { value: 'VIEWER', label: 'Viewer / Auditor (Pemantau)', icon: Eye },
                   ]}
                   placeholder="-- Pilih Role User --"

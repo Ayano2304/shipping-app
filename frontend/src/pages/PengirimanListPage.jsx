@@ -52,7 +52,7 @@ export default function PengirimanListPage() {
   const [berlayarCount, setBerlayarCount] = useState(0)
 
   const isViewer = user?.role === 'VIEWER'
-  const canCreate = ['ADMIN', 'PETUGAS', 'SURVEYOR'].includes(user?.role)
+  const canCreate = ['ADMIN', 'PETUGAS'].includes(user?.role)
 
   const loadData = async () => {
     setLoading(true)
@@ -263,7 +263,7 @@ export default function PengirimanListPage() {
                           ) : (
                             <>
                               {/* Tombol INPUT KEDATANGAN */}
-                              {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id !== p.createdById)) && (
+                              {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && ['ADMIN', 'SURVEYOR'].includes(user?.role) && (
                                 <button
                                   onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
@@ -282,7 +282,7 @@ export default function PengirimanListPage() {
                                 <Eye size={14} />
                               </button>
                               
-                              {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id === p.createdById)) && (
+                              {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS'].includes(user?.role) && (user?.role === 'ADMIN' || user?.id === p.createdById) && (
                                 <button
                                   onClick={() => navigate(`/pengiriman/${p.id}/edit`)}
                                   className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-all shadow-xs"
@@ -345,7 +345,7 @@ export default function PengirimanListPage() {
                     ) : (
                       <>
                         <div>
-                          {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id !== p.createdById)) && (
+                          {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && ['ADMIN', 'SURVEYOR'].includes(user?.role) && (
                             <button
                               onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
                               className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs font-semibold shadow-sm"
@@ -356,7 +356,7 @@ export default function PengirimanListPage() {
                         </div>
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => navigate(`/pengiriman/${p.id}`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-foreground"><Eye size={14} /></button>
-                          {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && (user?.role === 'ADMIN' || (['PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id === p.createdById)) && (
+                          {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS'].includes(user?.role) && (user?.role === 'ADMIN' || user?.id === p.createdById) && (
                             <button onClick={() => navigate(`/pengiriman/${p.id}/edit`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-amber-500"><Pencil size={14} /></button>
                           )}
                           {user?.role === 'ADMIN' && (

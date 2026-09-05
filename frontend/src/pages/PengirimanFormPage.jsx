@@ -40,6 +40,11 @@ export default function PengirimanFormPage() {
   const [palkaBerangkat, setPalkaBerangkat] = useState([defaultRow(1)])
 
   useEffect(() => {
+    if (user && !['ADMIN', 'PETUGAS'].includes(user?.role)) {
+      toast.error('Sebagai Surveyor Bongkar, Anda tidak berwenang membuat atau mengedit data keberangkatan.')
+      navigate('/pengiriman', { replace: true })
+      return
+    }
     getKapal().then(r => setKapalList(r.data)).catch(console.error)
     if (isEdit) {
       setLoading(true)

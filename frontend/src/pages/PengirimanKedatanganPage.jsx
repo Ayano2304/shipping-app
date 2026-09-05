@@ -41,8 +41,8 @@ export default function PengirimanKedatanganPage() {
           navigate(`/pengiriman/${id}`, { replace: true })
           return
         }
-        if (user?.role === 'PETUGAS' && d.createdById === user?.id && user?.role !== 'ADMIN') {
-          toast.error('Sebagai petugas pelabuhan muat, Anda tidak dapat menginput sounding kedatangan.')
+        if (user && !['ADMIN', 'SURVEYOR'].includes(user?.role)) {
+          toast.error('Sebagai Petugas Muat, Anda tidak berwenang menginput data kedatangan. Halaman ini khusus untuk Surveyor Bongkar atau Admin.')
           navigate(`/pengiriman/${id}`, { replace: true })
           return
         }

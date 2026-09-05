@@ -359,7 +359,7 @@ export default function PengirimanDetailPage() {
 
   const isCreator = user?.id === data.createdById
   const hasKedatanganPalka = palkaDatang.length > 0
-  const canInputKedatangan = (isBerlayar || (!hasKedatanganPalka && isSelesai) || user?.role === 'ADMIN') && (['ADMIN', 'PETUGAS', 'SURVEYOR'].includes(user?.role) && (!isCreator || user?.role === 'ADMIN'))
+  const canInputKedatangan = (isBerlayar || (!hasKedatanganPalka && isSelesai) || user?.role === 'ADMIN') && ['ADMIN', 'SURVEYOR'].includes(user?.role)
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
@@ -419,7 +419,7 @@ export default function PengirimanDetailPage() {
             </Link>
           )}
 
-          {(!isSelesai || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS', 'SURVEYOR'].includes(user?.role) && (
+          {(!isSelesai || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS'].includes(user?.role) && (user?.role === 'ADMIN' || isCreator) && (
             <Link
               to={`/pengiriman/${id}/edit`}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs sm:text-sm font-semibold transition-all shadow-xs"

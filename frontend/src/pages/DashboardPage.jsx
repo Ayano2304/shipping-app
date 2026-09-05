@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const navigate = useNavigate()
 
   const isViewer = user?.role === 'VIEWER'
-  const canCreate = ['ADMIN', 'PETUGAS', 'SURVEYOR'].includes(user?.role)
+  const canCreate = ['ADMIN', 'PETUGAS'].includes(user?.role)
 
   useEffect(() => {
     const load = async () => {
@@ -200,7 +200,7 @@ export default function DashboardPage() {
                     <Eye size={13} /> <span>Lihat Rincian</span>
                   </Link>
                 ) : (
-                  ['ADMIN', 'PETUGAS', 'SURVEYOR'].includes(user?.role) && user?.id !== k.createdById ? (
+                  ['ADMIN', 'SURVEYOR'].includes(user?.role) ? (
                     <Link
                       to={`/pengiriman/${k.id}/kedatangan`}
                       className="w-full sm:w-auto text-center flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs whitespace-nowrap"

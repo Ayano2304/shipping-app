@@ -83,10 +83,18 @@ exports.saveBatch = async (req, res) => {
     
     let kapalId = req.body.kapalId || pengiriman.kapalId;
 
-    if (tipe.toUpperCase() === 'KEDATANGAN') {
-      if (req.user.role === 'PETUGAS' && pengiriman.createdById === req.user.id && req.user.role !== 'ADMIN') {
+    if (tipe.toUpperCase() === 'KEBERANGKATAN') {
+      if (req.user.role === 'SURVEYOR') {
         return res.status(403).json({
-          error: 'Sebagai petugas pelabuhan muat, Anda tidak dapat menginput sounding kedatangan. Sounding kedatangan harus diinput oleh Petugas Pelabuhan Tujuan atau Admin.'
+          error: 'Sebagai Surveyor Bongkar, Anda hanya berwenang menginput sounding kedatangan (SFBD).'
+        });
+      }
+    }
+
+    if (tipe.toUpperCase() === 'KEDATANGAN') {
+      if (req.user.role === 'PETUGAS') {
+        return res.status(403).json({
+          error: 'Sebagai Petugas Muat, Anda hanya berwenang menginput sounding keberangkatan (SFAL). Sounding kedatangan harus diinput oleh Surveyor Bongkar atau Admin.'
         });
       }
       // Update dischargedById pada pengiriman

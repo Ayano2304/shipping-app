@@ -97,7 +97,7 @@ export default function Sidebar({ open, onClose }) {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-foreground truncate">{user?.nama}</div>
             <div className="text-[10px] font-semibold text-primary uppercase tracking-wider">
-              {user?.role === 'VIEWER' ? 'Viewer / Auditor' : user?.role === 'ADMIN' ? 'Administrator' : user?.role === 'SURVEYOR' ? 'Surveyor' : 'Petugas'}
+              {user?.role === 'VIEWER' ? 'Viewer / Auditor' : user?.role === 'ADMIN' ? 'Administrator' : user?.role === 'SURVEYOR' ? 'Surveyor Bongkar' : 'Petugas Muat'}
             </div>
           </div>
         </div>
