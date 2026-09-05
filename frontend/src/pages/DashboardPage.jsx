@@ -68,7 +68,6 @@ export default function DashboardPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
 
-  const isViewer = user?.role === 'VIEWER'
   const canCreate = ['ADMIN', 'PETUGAS'].includes(user?.role)
 
   useEffect(() => {
@@ -192,29 +191,20 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {isViewer ? (
+                {['ADMIN', 'SURVEYOR'].includes(user?.role) ? (
+                  <Link
+                    to={`/pengiriman/${k.id}/kedatangan`}
+                    className="w-full sm:w-auto text-center flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs whitespace-nowrap"
+                  >
+                    <Anchor size={13} /> <span>Input Kedatangan</span>
+                  </Link>
+                ) : (
                   <Link
                     to={`/pengiriman/${k.id}`}
                     className="w-full sm:w-auto text-center flex items-center justify-center gap-1.5 px-3.5 py-2 bg-secondary/80 hover:bg-secondary text-foreground rounded-xl text-xs font-semibold transition-colors border border-border/80 whitespace-nowrap"
                   >
-                    <Eye size={13} /> <span>Lihat Rincian</span>
+                    <Eye size={13} /> <span>Lihat Detail</span>
                   </Link>
-                ) : (
-                  ['ADMIN', 'SURVEYOR'].includes(user?.role) ? (
-                    <Link
-                      to={`/pengiriman/${k.id}/kedatangan`}
-                      className="w-full sm:w-auto text-center flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs whitespace-nowrap"
-                    >
-                      <Anchor size={13} /> <span>Input Kedatangan</span>
-                    </Link>
-                  ) : (
-                    <Link
-                      to={`/pengiriman/${k.id}`}
-                      className="w-full sm:w-auto text-center flex items-center justify-center gap-1.5 px-3.5 py-2 bg-secondary/80 hover:bg-secondary text-foreground rounded-xl text-xs font-semibold transition-colors border border-border/80 whitespace-nowrap"
-                    >
-                      <Eye size={13} /> <span>Lihat Detail</span>
-                    </Link>
-                  )
                 )}
               </div>
             ))}

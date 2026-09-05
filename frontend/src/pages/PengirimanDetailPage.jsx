@@ -359,7 +359,9 @@ export default function PengirimanDetailPage() {
 
   const isCreator = user?.id === data.createdById
   const hasKedatanganPalka = palkaDatang.length > 0
-  const canInputKedatangan = (isBerlayar || (!hasKedatanganPalka && isSelesai) || user?.role === 'ADMIN') && ['ADMIN', 'SURVEYOR'].includes(user?.role)
+  const canInputKedatangan = isBerlayar
+    ? ['ADMIN', 'SURVEYOR'].includes(user?.role)
+    : (user?.role === 'ADMIN' && isSelesai)
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
@@ -415,7 +417,7 @@ export default function PengirimanDetailPage() {
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold transition-all shadow-sm active:scale-95"
             >
               <Anchor size={15} />
-              <span>{hasKedatanganPalka ? 'Edit Kedatangan' : 'Input Kedatangan'}</span>
+              <span>{isSelesai ? 'Revisi Kedatangan' : 'Input Kedatangan'}</span>
             </Link>
           )}
 

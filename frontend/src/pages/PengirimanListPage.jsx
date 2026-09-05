@@ -51,7 +51,6 @@ export default function PengirimanListPage() {
   // Count per status for quick tabs
   const [berlayarCount, setBerlayarCount] = useState(0)
 
-  const isViewer = user?.role === 'VIEWER'
   const canCreate = ['ADMIN', 'PETUGAS'].includes(user?.role)
 
   const loadData = async () => {
@@ -251,56 +250,43 @@ export default function PengirimanListPage() {
                       <td className="px-4 py-3.5 text-center"><StatusBadge status={p.status} /></td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Untuk Viewer: tombol jelas dan rapi menuju rincian */}
-                          {isViewer ? (
-                            <Link
-                              to={`/pengiriman/${p.id}`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground text-xs font-semibold transition-all shadow-xs"
+                          {/* Tombol INPUT KEDATANGAN (Hanya jika kapal sedang berlayar) */}
+                          {p.status === 'DALAM_PERJALANAN' && ['ADMIN', 'SURVEYOR'].includes(user?.role) && (
+                            <button
+                              onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                              title="Input Sounding Kedatangan"
                             >
-                              <Eye size={13} />
-                              <span>Lihat Rincian</span>
-                            </Link>
-                          ) : (
-                            <>
-                              {/* Tombol INPUT KEDATANGAN */}
-                              {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && ['ADMIN', 'SURVEYOR'].includes(user?.role) && (
-                                <button
-                                  onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
-                                  title="Input Sounding Kedatangan"
-                                >
-                                  <Anchor size={13} />
-                                  <span>Kedatangan</span>
-                                </button>
-                              )}
+                              <Anchor size={13} />
+                              <span>Kedatangan</span>
+                            </button>
+                          )}
 
-                              <button
-                                onClick={() => navigate(`/pengiriman/${p.id}`)}
-                                className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground transition-all shadow-xs"
-                                title="Detail Pengiriman"
-                              >
-                                <Eye size={14} />
-                              </button>
-                              
-                              {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS'].includes(user?.role) && (user?.role === 'ADMIN' || user?.id === p.createdById) && (
-                                <button
-                                  onClick={() => navigate(`/pengiriman/${p.id}/edit`)}
-                                  className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-all shadow-xs"
-                                  title="Edit Data"
-                                >
-                                  <Pencil size={14} />
-                                </button>
-                              )}
-                              {user?.role === 'ADMIN' && (
-                                <button
-                                  onClick={() => setConfirmDelete({ id: p.id, namaKapal: p.kapal?.namaKapal })}
-                                  className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all shadow-xs"
-                                  title="Hapus Pengiriman"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </>
+                          <button
+                            onClick={() => navigate(`/pengiriman/${p.id}`)}
+                            className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground transition-all shadow-xs"
+                            title="Detail Pengiriman"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          
+                          {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS'].includes(user?.role) && (user?.role === 'ADMIN' || user?.id === p.createdById) && (
+                            <button
+                              onClick={() => navigate(`/pengiriman/${p.id}/edit`)}
+                              className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-amber-500/10 text-muted-foreground hover:text-amber-500 transition-all shadow-xs"
+                              title="Edit Data"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          )}
+                          {user?.role === 'ADMIN' && (
+                            <button
+                              onClick={() => setConfirmDelete({ id: p.id, namaKapal: p.kapal?.namaKapal })}
+                              className="w-8 h-8 flex items-center justify-center rounded-xl border border-border/80 bg-secondary/50 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all shadow-xs"
+                              title="Hapus Pengiriman"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -335,36 +321,25 @@ export default function PengirimanListPage() {
 
                   {/* Action buttons for mobile */}
                   <div className="flex items-center justify-between pt-1 border-t border-border/40">
-                    {isViewer ? (
-                      <Link
-                        to={`/pengiriman/${p.id}`}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-secondary hover:bg-secondary/80 text-foreground border border-border/80 rounded-xl text-xs font-semibold shadow-xs"
-                      >
-                        <Eye size={13} /> <span>Lihat Rincian & PDF</span>
-                      </Link>
-                    ) : (
-                      <>
-                        <div>
-                          {(p.status === 'DALAM_PERJALANAN' || user?.role === 'ADMIN') && ['ADMIN', 'SURVEYOR'].includes(user?.role) && (
-                            <button
-                              onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs font-semibold shadow-sm"
-                            >
-                              <Anchor size={13} /> <span>Kedatangan</span>
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => navigate(`/pengiriman/${p.id}`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-foreground"><Eye size={14} /></button>
-                          {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS'].includes(user?.role) && (user?.role === 'ADMIN' || user?.id === p.createdById) && (
-                            <button onClick={() => navigate(`/pengiriman/${p.id}/edit`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-amber-500"><Pencil size={14} /></button>
-                          )}
-                          {user?.role === 'ADMIN' && (
-                            <button onClick={() => setConfirmDelete({ id: p.id, namaKapal: p.kapal?.namaKapal })} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-red-500"><Trash2 size={14} /></button>
-                          )}
-                        </div>
-                      </>
-                    )}
+                    <div>
+                      {p.status === 'DALAM_PERJALANAN' && ['ADMIN', 'SURVEYOR'].includes(user?.role) && (
+                        <button
+                          onClick={() => navigate(`/pengiriman/${p.id}/kedatangan`)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-xl text-xs font-semibold shadow-sm"
+                        >
+                          <Anchor size={13} /> <span>Kedatangan</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => navigate(`/pengiriman/${p.id}`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-foreground"><Eye size={14} /></button>
+                      {(p.status !== 'SELESAI' || user?.role === 'ADMIN') && ['ADMIN', 'PETUGAS'].includes(user?.role) && (user?.role === 'ADMIN' || user?.id === p.createdById) && (
+                        <button onClick={() => navigate(`/pengiriman/${p.id}/edit`)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-amber-500"><Pencil size={14} /></button>
+                      )}
+                      {user?.role === 'ADMIN' && (
+                        <button onClick={() => setConfirmDelete({ id: p.id, namaKapal: p.kapal?.namaKapal })} className="w-8 h-8 flex items-center justify-center rounded-xl bg-secondary text-red-500"><Trash2 size={14} /></button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

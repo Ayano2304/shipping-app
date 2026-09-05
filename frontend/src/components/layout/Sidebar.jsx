@@ -8,13 +8,6 @@ import {
 import { cn } from '../../lib/utils'
 
 const getNavItems = (role) => {
-  if (role === 'VIEWER') {
-    return [
-      { to: '/dashboard', label: 'Dashboard Eksekutif', icon: LayoutDashboard },
-      { to: '/pengiriman', label: 'Monitoring Muatan', icon: Ship },
-    ]
-  }
-
   return [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/pengiriman', label: 'Riwayat Pengiriman', icon: ClipboardList },
@@ -97,7 +90,7 @@ export default function Sidebar({ open, onClose }) {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-foreground truncate">{user?.nama}</div>
             <div className="text-[10px] font-semibold text-primary uppercase tracking-wider">
-              {user?.role === 'VIEWER' ? 'Viewer / Auditor' : user?.role === 'ADMIN' ? 'Administrator' : user?.role === 'SURVEYOR' ? 'Surveyor Bongkar' : 'Petugas Muat'}
+              {user?.role === 'ADMIN' ? 'Administrator' : user?.role === 'SURVEYOR' ? 'Surveyor Bongkar' : 'Petugas Muat'}
             </div>
           </div>
         </div>

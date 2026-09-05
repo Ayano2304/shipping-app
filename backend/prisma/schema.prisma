@@ -146,7 +146,6 @@ enum Role {
   ADMIN
   PETUGAS
   SURVEYOR
-  VIEWER
 }
 
 enum SatuanBL {

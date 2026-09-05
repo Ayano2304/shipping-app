@@ -192,7 +192,6 @@ export default function UsersPage() {
                     { value: 'ADMIN', label: 'Administrator (Akses Penuh)', icon: Shield },
                     { value: 'PETUGAS', label: 'Petugas Muat (Input Keberangkatan / SFAL)', icon: HardHat },
                     { value: 'SURVEYOR', label: 'Surveyor Bongkar (Input Kedatangan / SFBD)', icon: UserCheck },
-                    { value: 'VIEWER', label: 'Viewer / Auditor (Pemantau)', icon: Eye },
                   ]}
                   placeholder="-- Pilih Role User --"
                 />

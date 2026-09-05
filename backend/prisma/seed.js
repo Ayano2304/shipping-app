@@ -36,19 +36,19 @@ async function main() {
   });
   console.log('✅ Petugas user:', petugas.username);
 
-  // Seed viewer user
-  const viewerPassword = await bcrypt.hash('viewer123', 10);
-  const viewer = await prisma.user.upsert({
-    where: { username: 'viewer1' },
+  // Seed surveyor user
+  const surveyorPassword = await bcrypt.hash('surveyor123', 10);
+  const surveyor = await prisma.user.upsert({
+    where: { username: 'surveyor1' },
     update: {},
     create: {
       nama: 'Siti Rahma',
-      username: 'viewer1',
-      password: viewerPassword,
-      role: 'VIEWER',
+      username: 'surveyor1',
+      password: surveyorPassword,
+      role: 'SURVEYOR',
     },
   });
-  console.log('✅ Viewer user:', viewer.username);
+  console.log('✅ Surveyor user:', surveyor.username);
 
   // Seed kapal
   const kapalData = [

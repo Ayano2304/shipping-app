@@ -25,9 +25,8 @@
 | 1 | **ADMIN** | Memiliki akses penuh ke seluruh modul sistem: mengelola akun pengguna, data master kapal, unggah tabel sounding/density via Excel, revisi data pengiriman di semua status, konfigurasi integrasi WhatsApp, dan audit log. |
 | 2 | **PETUGAS** *(Petugas Muat / Loading Officer)* | Bertanggung jawab membuat data pengiriman baru, menginput data sounding palka keberangkatan (SFAL), serta mengirim laporan keberangkatan via WhatsApp. |
 | 3 | **SURVEYOR** *(Petugas Bongkar / Discharge Officer)* | Bertanggung jawab menginput data sounding palka kedatangan di pelabuhan tujuan (SFBD), memverifikasi analisis susut muatan (R1, R2, R3), dan menyelesaikan status pengiriman. |
-| 4 | **VIEWER** *(Manajemen / Eksekutif)* | Akses *read-only* untuk melihat dashboard analitik, memantau posisi/status pengiriman kapal, serta mengunduh dokumen laporan PDF resmi. |
-| 5 | **GATEWAY WHATSAPP (FONNTE)** *(External System)* | Layanan pihak ketiga yang bertindak mengeksekusi pengiriman pesan otomatis ke nomor WhatsApp para pemangku kepentingan (*stakeholders*). |
-| 6 | **CLOUDFLARE TURNSTILE** *(External System)* | Layanan verifikasi keamanan untuk memastikan permintaan login dilakukan oleh manusia asli (bukan serangan bot/brute-force). |
+| 4 | **GATEWAY WHATSAPP (FONNTE)** *(External System)* | Layanan pihak ketiga yang bertindak mengeksekusi pengiriman pesan otomatis ke nomor WhatsApp para pemangku kepentingan (*stakeholders*). |
+| 5 | **CLOUDFLARE TURNSTILE** *(External System)* | Layanan verifikasi keamanan untuk memastikan permintaan login dilakukan oleh manusia asli (bukan serangan bot/brute-force). |
 
 ---
 
@@ -39,7 +38,6 @@ flowchart LR
     Admin["fa:fa-user-tie Admin"]
     Petugas["fa:fa-user-shield Petugas Muat"]
     Surveyor["fa:fa-user-check Surveyor / Bongkar"]
-    Viewer["fa:fa-user Viewer / Manajemen"]
     FonnteSystem["fa:fa-robot Gateway WhatsApp"]
     CloudflareSystem["fa:fa-shield-halved Cloudflare Turnstile"]
 
@@ -80,11 +78,7 @@ flowchart LR
     Surveyor --> UC7
     Surveyor --> UC8
     Surveyor --> UC9
-
-    Viewer --> UC1
-    Viewer --> UC7
-    Viewer --> UC8
-
+ 
     UC1 -.->|Verifikasi| CloudflareSystem
     UC9 -.->|Kirim Pesan API| FonnteSystem
 ```
@@ -94,7 +88,7 @@ flowchart LR
 ## 4. SPESIFIKASI RINCI USE CASE (USE CASE SPECIFICATIONS)
 
 ### UC-01: Autentikasi & Verifikasi CAPTCHA
-* **Aktor**: Semua Aktor (Admin, Petugas, Surveyor, Viewer).
+* **Aktor**: Semua Aktor (Admin, Petugas, Surveyor).
 * **Prekondisi**: Pengguna memiliki akun aktif di sistem.
 * **Alur Utama**:
   1. Pengguna membuka halaman Login.

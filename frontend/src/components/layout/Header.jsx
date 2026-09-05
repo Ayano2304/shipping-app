@@ -20,8 +20,8 @@ const getHeaderLabel = (pathname) => {
 
 const formatRole = (role) => {
   if (role === 'ADMIN') return 'ADMINISTRATOR'
-  if (role === 'PETUGAS') return 'PETUGAS OPERASIONAL'
-  if (role === 'VIEWER') return 'VIEWER / AUDITOR'
+  if (role === 'PETUGAS') return 'PETUGAS MUAT'
+  if (role === 'SURVEYOR') return 'SURVEYOR BONGKAR'
   return role || 'PENGGUNA'
 }
 
