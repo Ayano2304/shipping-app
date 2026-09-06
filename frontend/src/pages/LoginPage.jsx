@@ -16,11 +16,18 @@ export default function LoginPage() {
   const { theme, toggleTheme } = useThemeStore()
   const navigate = useNavigate()
 
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAElDaDEfccS-7If-'
+  // Deteksi mode development atau localhost
+  const isDev = import.meta.env.DEV || ['localhost', '127.0.0.1'].includes(window.location.hostname)
+
+  // Di development, gunakan testing site key resmi Cloudflare (Always-Passes) yang valid di domain apapun termasuk localhost
+  const turnstileSiteKey = isDev
+    ? '1x00000000000000000000AA'
+    : (import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAElDaDEfccS-7If-')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (turnstileSiteKey && !captchaToken) {
+    // Di production wajib ada token captcha
+    if (!isDev && turnstileSiteKey && !captchaToken) {
       toast.error('Silakan selesaikan verifikasi keamanan (CAPTCHA) terlebih dahulu.')
       return
     }
@@ -29,7 +36,7 @@ export default function LoginPage() {
     try {
       const { data } = await login({
         ...form,
-        captchaToken,
+        captchaToken: captchaToken || (isDev ? 'dev-bypass-token' : ''),
       })
       setAuth(data.token, data.user)
       toast.success(`Selamat datang, ${data.user.nama}!`)
@@ -126,22 +133,30 @@ export default function LoginPage() {
 
             {/* Cloudflare Turnstile CAPTCHA */}
             {turnstileSiteKey && (
-              <div className="flex justify-center py-1">
+              <div className="flex flex-col items-center py-1">
                 <Turnstile
                   siteKey={turnstileSiteKey}
                   onSuccess={(token) => setCaptchaToken(token)}
-                  onExpire={() => setCaptchaToken('')}
+                  onExpire={() => setCaptchaToken(isDev ? 'dev-bypass-token' : '')}
+                  onError={() => {
+                    if (isDev) setCaptchaToken('dev-bypass-token')
+                  }}
                   options={{
                     theme: theme === 'dark' ? 'dark' : 'light',
                     size: 'normal',
                   }}
                 />
+                {isDev && (
+                  <span className="text-[10px] text-muted-foreground mt-1 bg-secondary/80 px-2 py-0.5 rounded-md border border-border">
+                    🛠️ Mode Development: CAPTCHA Otomatis Lolos
+                  </span>
+                )}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading || (turnstileSiteKey && !captchaToken)}
+              disabled={loading || (!isDev && turnstileSiteKey && !captchaToken)}
               className="w-full h-10 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 cursor-pointer"
             >
               {loading ? <><Loader2 size={16} className="animate-spin" /> Memproses...</> : 'Masuk'}

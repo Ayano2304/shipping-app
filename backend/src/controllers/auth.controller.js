@@ -3,6 +3,21 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const verifyTurnstile = async (token, remoteIp) => {
+  // Bypass otomatis jika di environment development / non-production
+  if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+    return true;
+  }
+
+  // Bypass jika token adalah development bypass token atau testing token Cloudflare
+  if (token === 'dev-bypass-token' || token === '1x00000000000000000000AA') {
+    return true;
+  }
+
+  // Bypass jika IP request berasal dari localhost / loopback
+  if (remoteIp && (remoteIp.includes('127.0.0.1') || remoteIp.includes('::1') || remoteIp === 'localhost')) {
+    return true;
+  }
+
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) return true; // Bypass jika belum dikonfigurasi
   if (!token) return false;
@@ -36,8 +51,9 @@ exports.login = async (req, res) => {
       return res.status(400).json({ error: 'Username dan password wajib diisi.' });
     }
 
-    // Verifikasi Keamanan Cloudflare Turnstile
-    if (process.env.TURNSTILE_SECRET_KEY) {
+    // Verifikasi Keamanan Cloudflare Turnstile (hanya diwajibkan di production)
+    const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+    if (!isDev && process.env.TURNSTILE_SECRET_KEY) {
       const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
       const isValidCaptcha = await verifyTurnstile(captchaToken, ip);
       if (!isValidCaptcha) {
