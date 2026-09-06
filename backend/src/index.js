@@ -63,12 +63,21 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 
-// Hanya jalankan app.listen di development (bukan di Vercel serverless)
-if (process.env.NODE_ENV !== 'production') {
+const whatsappManager = require('./services/whatsappManager');
+
+// Jalankan server jika bukan di lingkungan Vercel serverless
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server berjalan di http://0.0.0.0:${PORT}`);
     console.log(`📱 Akses dari HP: http://192.168.1.8:${PORT}/api`);
     console.log(`📊 Prisma Studio: npx prisma studio`);
+
+    // Inisialisasi WhatsApp sessions
+    if (!process.env.VERCEL) {
+      whatsappManager.initAll().catch(err => {
+        console.error('Failed to init WhatsApp sessions:', err);
+      });
+    }
   });
 }
 

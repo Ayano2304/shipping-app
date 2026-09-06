@@ -1,6 +1,8 @@
 const prisma = require('../lib/prisma');
+const crypto = require('crypto');
+const whatsappManager = require('../services/whatsappManager');
 const { generatePengirimanPDFBuffer } = require('../utils/pdfGenerator');
-const { generatePdfToken, generateReportSlug } = require('./export.controller');
+const { generateReportSlug } = require('./export.controller');
 
 const toKg = (nilai, satuan) => satuan === 'MT' ? parseFloat(nilai) * 1000 : parseFloat(nilai);
 
@@ -10,21 +12,7 @@ const formatAngka = (n, decimal = 0) => {
 };
 
 const formatNomorWA = (nomor) => {
-  if (!nomor) return '';
-  let clean = nomor.toString().replace(/[^0-9,]/g, '');
-  return clean.split(',').map(n => {
-    let num = n.trim();
-    if (num.startsWith('08')) {
-      num = '628' + num.slice(2);
-    } else if (num.startsWith('8')) {
-      num = '628' + num.slice(1);
-    }
-    return num;
-  }).filter(Boolean).join(',');
-};
-
-const getFonnteToken = (req) => {
-  return req.body?.fonnteToken || req.headers['x-fonnte-token'] || process.env.FONNTE_TOKEN;
+  return whatsappManager.cleanPhoneNumber(nomor);
 };
 
 const defaultTemplates = [
@@ -127,7 +115,6 @@ exports.getTemplates = async (req, res) => {
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }]
     });
 
-    // Inisialisasi atau sinkronisasi default templates
     if (list.length === 0) {
       for (const t of defaultTemplates) {
         await prisma.templatePesan.create({ data: t });
@@ -136,7 +123,6 @@ exports.getTemplates = async (req, res) => {
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }]
       });
     } else {
-      // Perbarui template bawaan agar bebas dari emoji lama
       for (const t of defaultTemplates) {
         const existing = list.find(item => item.nama === t.nama && item.isDefault);
         if (existing && existing.isi !== t.isi) {
@@ -217,27 +203,24 @@ exports.deleteTemplate = async (req, res) => {
   }
 };
 
-// ─── WA MULTI-DEVICE MANAGEMENT (FONNTE) ───
+// ─── WA MULTI-DEVICE MANAGEMENT (NATIVE WHATSAPP WEB JS) ───
 
-const resolveSenderToken = async (req, deviceId) => {
+const resolveSenderDevice = async (req, deviceId) => {
   if (deviceId) {
     const dev = await prisma.deviceWa.findUnique({ where: { id: parseInt(deviceId) } });
-    if (dev && dev.token) return { token: dev.token, device: dev };
+    if (dev) return dev;
   }
   if (req.user?.id) {
     const userDev = await prisma.deviceWa.findFirst({ where: { userId: req.user.id } });
-    if (userDev && userDev.token) return { token: userDev.token, device: userDev };
+    if (userDev) return userDev;
   }
   const defaultDev = await prisma.deviceWa.findFirst({ where: { isDefault: true } });
-  if (defaultDev && defaultDev.token) return { token: defaultDev.token, device: defaultDev };
+  if (defaultDev) return defaultDev;
   const anyDev = await prisma.deviceWa.findFirst({ orderBy: { id: 'asc' } });
-  if (anyDev && anyDev.token) return { token: anyDev.token, device: anyDev };
-  
-  const fallback = req.body?.fonnteToken || req.headers['x-fonnte-token'] || process.env.FONNTE_TOKEN;
-  return { token: fallback, device: null };
+  return anyDev || null;
 };
 
-// 1. Ambil Semua Perangkat WhatsApp Terdaftar
+// 1. Ambil Semua Perangkat WhatsApp Terdaftar beserta Status Real-time
 exports.getDevices = async (req, res) => {
   try {
     const devices = await prisma.deviceWa.findMany({
@@ -246,53 +229,30 @@ exports.getDevices = async (req, res) => {
       },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }]
     });
-    res.json(devices);
+
+    // Perkaya data dengan status live dari whatsappManager
+    const enriched = await Promise.all(devices.map(async (dev) => {
+      const live = await whatsappManager.getStatus(dev.id);
+      return {
+        ...dev,
+        status: live.isConnected ? 'connected' : (dev.status === 'connected' && !live.isConnected ? 'disconnected' : dev.status),
+        nomorWa: live.nomorWa || dev.nomorWa
+      };
+    }));
+
+    res.json(enriched);
   } catch (err) {
     console.error('getDevices error:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// 2. Tambah Perangkat Otomatis via Fonnte API Add-Device (Cara 1)
+// 2. Tambah Perangkat Baru (Native Multi-Session)
 exports.addDeviceAuto = async (req, res) => {
   try {
-    const { nama, device, userId, isDefault = false, accountToken: customAccountToken } = req.body;
+    const { nama, device, userId, isDefault = false } = req.body;
     if (!nama || !nama.trim()) {
       return res.status(400).json({ error: 'Nama perangkat wajib diisi.' });
-    }
-    if (!device || !device.trim()) {
-      return res.status(400).json({ error: 'Nomor HP / identifier device wajib diisi.' });
-    }
-
-    const accountToken = (customAccountToken && customAccountToken.trim()) 
-      || process.env.FONNTE_ACCOUNT_TOKEN 
-      || process.env.FONNTE_TOKEN;
-
-    if (!accountToken) {
-      return res.status(400).json({
-        error: 'FONNTE_ACCOUNT_TOKEN belum diatur di file .env server atau masukkan Account Token Fonnte Anda.'
-      });
-    }
-
-    // Panggil Fonnte API Add-Device
-    const response = await fetch('https://api.fonnte.com/add-device', {
-      method: 'POST',
-      headers: {
-        'Authorization': accountToken.trim(),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: nama.trim().substring(0, 30),
-        device: device.trim().replace(/[^0-9]/g, '')
-      })
-    });
-
-    const result = await response.json();
-    if (!result.status || !result.token) {
-      return res.status(400).json({
-        error: `Gagal membuat device di Fonnte: ${result.reason || 'Respons tidak valid dari Fonnte'}`,
-        raw: result
-      });
     }
 
     // Jika dijadikan default, nonaktifkan isDefault pada perangkat lain
@@ -300,11 +260,12 @@ exports.addDeviceAuto = async (req, res) => {
       await prisma.deviceWa.updateMany({ data: { isDefault: false } });
     }
 
+    const token = 'wa_sess_' + crypto.randomBytes(12).toString('hex');
     const newDevice = await prisma.deviceWa.create({
       data: {
         nama: nama.trim(),
-        token: result.token,
-        nomorWa: result.device || device.trim(),
+        token,
+        nomorWa: device ? device.trim().replace(/[^0-9]/g, '') : null,
         status: 'disconnected',
         isDefault: Boolean(isDefault),
         userId: userId ? parseInt(userId) : null
@@ -314,11 +275,14 @@ exports.addDeviceAuto = async (req, res) => {
       }
     });
 
+    // Inisialisasi client browser WhatsApp untuk device ini di background
+    whatsappManager.createClient(newDevice.id);
+
     res.status(201).json({
       success: true,
-      message: 'Perangkat WhatsApp berhasil dibuat otomatis di Fonnte!',
+      message: 'Perangkat WhatsApp berhasil dibuat! Silakan scan QR Code.',
       device: newDevice,
-      token: result.token
+      token
     });
   } catch (err) {
     console.error('addDeviceAuto error:', err);
@@ -326,52 +290,9 @@ exports.addDeviceAuto = async (req, res) => {
   }
 };
 
-// 3. Tambah Perangkat Manual (Jika User Sudah Punya Device Token)
+// 3. Tambah Perangkat Manual (Kompatibilitas Form)
 exports.addDeviceManual = async (req, res) => {
-  try {
-    const { nama, token, userId, isDefault = false } = req.body;
-    if (!nama || !nama.trim() || !token || !token.trim()) {
-      return res.status(400).json({ error: 'Nama perangkat dan Token Fonnte wajib diisi.' });
-    }
-
-    // Cek validitas token ke Fonnte
-    const fonnteRes = await fetch('https://api.fonnte.com/device', {
-      method: 'POST',
-      headers: { 'Authorization': token.trim() }
-    });
-    const fonnteData = await fonnteRes.json();
-
-    const deviceStatus = fonnteData.status ? (fonnteData.device_status || 'connected') : 'disconnected';
-    const nomorWa = fonnteData.device || null;
-
-    if (isDefault) {
-      await prisma.deviceWa.updateMany({ data: { isDefault: false } });
-    }
-
-    const newDevice = await prisma.deviceWa.create({
-      data: {
-        nama: nama.trim(),
-        token: token.trim(),
-        nomorWa,
-        status: deviceStatus,
-        isDefault: Boolean(isDefault),
-        userId: userId ? parseInt(userId) : null
-      },
-      include: {
-        user: { select: { id: true, nama: true, username: true, role: true } }
-      }
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Perangkat WhatsApp berhasil ditambahkan!',
-      device: newDevice,
-      fonnteData
-    });
-  } catch (err) {
-    console.error('addDeviceManual error:', err);
-    res.status(500).json({ error: err.message });
-  }
+  return exports.addDeviceAuto(req, res);
 };
 
 // 4. Ambil QR Code Perangkat untuk Scan Langsung di Web
@@ -381,30 +302,33 @@ exports.getDeviceQr = async (req, res) => {
     const device = await prisma.deviceWa.findUnique({ where: { id: parseInt(id) } });
     if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
 
-    // Request QR Code dari Fonnte
-    const response = await fetch('https://api.fonnte.com/qr', {
-      method: 'POST',
-      headers: {
-        'Authorization': device.token,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ type: 'qr' })
-    });
-    const result = await response.json();
+    const qrResult = await whatsappManager.getOrGenerateQr(device.id);
 
-    if (result.status) {
-      res.json({
+    if (qrResult.isConnected) {
+      return res.json({
         success: true,
-        url: result.url, // Base64 image string atau image URL
+        isConnected: true,
+        url: null,
+        deviceId: device.id,
+        nama: device.nama,
+        message: 'Perangkat sudah terhubung.'
+      });
+    }
+
+    if (qrResult.url) {
+      return res.json({
+        success: true,
+        isConnected: false,
+        url: qrResult.url, // Base64 data URL
         deviceId: device.id,
         nama: device.nama
       });
-    } else {
-      res.status(400).json({
-        error: result.reason || 'Gagal menghasilkan QR Code dari Fonnte. Pastikan device belum terhubung atau lakukan reset.',
-        raw: result
-      });
     }
+
+    res.status(400).json({
+      error: qrResult.error || 'Sedang menyiapkan QR Code, silakan segarkan dalam beberapa detik.',
+      deviceId: device.id
+    });
   } catch (err) {
     console.error('getDeviceQr error:', err);
     res.status(500).json({ error: err.message });
@@ -415,35 +339,37 @@ exports.getDeviceQr = async (req, res) => {
 exports.checkDeviceStatusById = async (req, res) => {
   try {
     const { id } = req.params;
-    const device = await prisma.deviceWa.findUnique({ where: { id: parseInt(id) } });
-    if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
-
-    const response = await fetch('https://api.fonnte.com/device', {
-      method: 'POST',
-      headers: { 'Authorization': device.token }
-    });
-    const result = await response.json();
-
-    const isConnected = result.status && (result.device_status === 'connect' || result.device_status === 'connected');
-    const newStatus = isConnected ? 'connected' : 'disconnected';
-    const nomor = result.device || device.nomorWa;
-
-    const updated = await prisma.deviceWa.update({
+    const device = await prisma.deviceWa.findUnique({
       where: { id: parseInt(id) },
-      data: {
-        status: newStatus,
-        nomorWa: nomor
-      },
       include: {
         user: { select: { id: true, nama: true, username: true, role: true } }
       }
     });
+    if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
+
+    const liveStatus = await whatsappManager.getStatus(device.id);
+    const isConnected = Boolean(liveStatus.isConnected);
+
+    let updatedDevice = device;
+    const newDbStatus = isConnected ? 'connected' : 'disconnected';
+    if (device.status !== newDbStatus || (liveStatus.nomorWa && liveStatus.nomorWa !== device.nomorWa)) {
+      updatedDevice = await prisma.deviceWa.update({
+        where: { id: device.id },
+        data: {
+          status: newDbStatus,
+          nomorWa: liveStatus.nomorWa || device.nomorWa
+        },
+        include: {
+          user: { select: { id: true, nama: true, username: true, role: true } }
+        }
+      });
+    }
 
     res.json({
       success: true,
-      device: updated,
-      fonnte: result,
-      isConnected
+      isConnected,
+      device: updatedDevice,
+      liveStatus
     });
   } catch (err) {
     console.error('checkDeviceStatusById error:', err);
@@ -451,28 +377,21 @@ exports.checkDeviceStatusById = async (req, res) => {
   }
 };
 
-// 6. Putuskan Koneksi Perangkat (Disconnect)
+// 6. Putuskan Koneksi Perangkat (Disconnect / Logout)
 exports.disconnectDevice = async (req, res) => {
   try {
     const { id } = req.params;
     const device = await prisma.deviceWa.findUnique({ where: { id: parseInt(id) } });
     if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
 
-    const response = await fetch('https://api.fonnte.com/disconnect', {
-      method: 'POST',
-      headers: { 'Authorization': device.token }
-    });
-    const result = await response.json();
+    await whatsappManager.disconnect(device.id);
 
-    await prisma.deviceWa.update({
-      where: { id: parseInt(id) },
-      data: { status: 'disconnected' }
-    });
+    const updated = await prisma.deviceWa.findUnique({ where: { id: device.id } });
 
     res.json({
       success: true,
       message: `Perangkat ${device.nama} berhasil diputuskan.`,
-      result
+      device: updated
     });
   } catch (err) {
     console.error('disconnectDevice error:', err);
@@ -502,7 +421,15 @@ exports.setDefaultDevice = async (req, res) => {
 exports.deleteDevice = async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.deviceWa.delete({ where: { id: parseInt(id) } });
+    const deviceId = parseInt(id);
+    const device = await prisma.deviceWa.findUnique({ where: { id: deviceId } });
+    if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
+
+    // Hapus sesi browser dan file dari disk
+    await whatsappManager.deleteSession(deviceId);
+    // Hapus data dari DB
+    await prisma.deviceWa.delete({ where: { id: deviceId } });
+
     res.json({ success: true, message: 'Perangkat WhatsApp berhasil dihapus.' });
   } catch (err) {
     console.error('deleteDevice error:', err);
@@ -520,27 +447,24 @@ exports.testDevice = async (req, res) => {
     const device = await prisma.deviceWa.findUnique({ where: { id: parseInt(id) } });
     if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
 
-    const targetFormatted = formatNomorWA(tujuanWa);
-    const testMsg = `*TES KONEKSI SISTEM CPO TANKER*\n━━━━━━━━━━━━━━━━━━━━\n✅ Pengirim: ${device.nama}\n📱 Nomor: ${device.nomorWa || '-'}\n🕒 Waktu: ${new Date().toLocaleString('id-ID')}\n━━━━━━━━━━━━━━━━━━━━\n_Pesan ini dikirim otomatis dari Dashboard Sistem CPO Tanker._`;
+    const testMsg = `*TES KONEKSI SISTEM CPO TANKER*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `✅ Pengirim: ${device.nama}\n` +
+      `📱 Nomor: ${device.nomorWa || '-'}\n` +
+      `🕒 Waktu: ${new Date().toLocaleString('id-ID')}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `_Pesan ini dikirim otomatis via Native WhatsApp Web JS._`;
 
-    const response = await fetch('https://api.fonnte.com/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': device.token,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ target: targetFormatted, message: testMsg })
+    const result = await whatsappManager.sendMessage(device.id, [tujuanWa], testMsg);
+
+    res.json({
+      success: true,
+      message: `Pesan tes berhasil dikirim ke ${tujuanWa}!`,
+      result
     });
-    const result = await response.json();
-
-    if (result.status) {
-      res.json({ success: true, message: `Pesan tes berhasil dikirim ke ${targetFormatted}!`, result });
-    } else {
-      res.status(400).json({ error: result.reason || 'Gagal mengirim pesan tes.', result });
-    }
   } catch (err) {
     console.error('testDevice error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message || 'Gagal mengirim pesan tes.' });
   }
 };
 
@@ -548,33 +472,22 @@ exports.testDevice = async (req, res) => {
 
 exports.checkDeviceStatus = async (req, res) => {
   try {
-    const fonnteToken = getFonnteToken(req);
-    if (!fonnteToken) {
-      return res.status(400).json({ error: 'API Token Fonnte belum diatur. Silakan masukkan token di Pengaturan atau file .env.' });
-    }
-
-    const response = await fetch('https://api.fonnte.com/device', {
-      method: 'POST',
-      headers: { 'Authorization': fonnteToken },
-    });
-    const result = await response.json();
-
-    if (result.status) {
-      return res.json({
-        success: true,
-        message: 'Device Fonnte terhubung!',
-        device: result.device || '-',
-        name: result.name || '-',
-        deviceStatus: result.device_status || 'connected',
-        expired: result.expired || '-'
-      });
-    } else {
+    const sender = await resolveSenderDevice(req);
+    if (!sender) {
       return res.status(400).json({
         success: false,
-        error: result.reason || 'Device Fonnte tidak terhubung atau token salah.',
-        raw: result
+        error: 'Belum ada perangkat WhatsApp yang terdaftar di sistem.'
       });
     }
+
+    const live = await whatsappManager.getStatus(sender.id);
+    res.json({
+      success: live.isConnected,
+      message: live.isConnected ? 'WhatsApp terhubung!' : 'WhatsApp belum terhubung.',
+      device: live.nomorWa || sender.nomorWa || '-',
+      name: sender.nama,
+      deviceStatus: live.isConnected ? 'connected' : 'disconnected'
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -582,9 +495,9 @@ exports.checkDeviceStatus = async (req, res) => {
 
 exports.testKoneksi = async (req, res) => {
   try {
-    const fonnteToken = getFonnteToken(req);
-    if (!fonnteToken) {
-      return res.status(400).json({ error: 'API Token Fonnte belum diatur.' });
+    const sender = await resolveSenderDevice(req);
+    if (!sender) {
+      return res.status(400).json({ error: 'Belum ada perangkat WhatsApp yang terdaftar.' });
     }
 
     const { tujuanWa } = req.body;
@@ -592,23 +505,13 @@ exports.testKoneksi = async (req, res) => {
       return res.status(400).json({ error: 'Nomor WhatsApp tujuan tes wajib diisi.' });
     }
 
-    const targetFormatted = formatNomorWA(tujuanWa);
-    const testMessage = `*TES KONEKSI SISTEM CPO TANKER*\n━━━━━━━━━━━━━━━━━━━━\n✅ Integrasi WhatsApp Fonnte Berhasil!\n🕒 Waktu: ${new Date().toLocaleString('id-ID')}\n━━━━━━━━━━━━━━━━━━━━\n_Pesan ini dikirim secara otomatis dari Dashboard Pengaturan._`;
+    const testMessage = `*TES KONEKSI SISTEM CPO TANKER*\n━━━━━━━━━━━━━━━━━━━━\n✅ Integrasi WhatsApp Berhasil!\n🕒 Waktu: ${new Date().toLocaleString('id-ID')}\n━━━━━━━━━━━━━━━━━━━━\n_Pesan ini dikirim secara otomatis via Native WhatsApp Web JS._`;
 
-    const response = await fetch('https://api.fonnte.com/send', {
-      method: 'POST',
-      headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target: targetFormatted, message: testMessage }),
-    });
-    const result = await response.json();
+    const result = await whatsappManager.sendMessage(sender.id, [tujuanWa], testMessage);
 
-    if (result.status) {
-      res.json({ message: 'Pesan tes WhatsApp berhasil terkirim ke ' + targetFormatted, result });
-    } else {
-      res.status(400).json({ error: 'Gagal kirim pesan tes: ' + (result.reason || 'Token atau nomor tidak valid'), result });
-    }
+    res.json({ message: 'Pesan tes WhatsApp berhasil terkirim ke ' + tujuanWa, result });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message || 'Gagal kirim pesan tes.' });
   }
 };
 
@@ -629,7 +532,7 @@ exports.kirimLaporan = async (req, res) => {
 
     const { tujuanWa, targets, attachPdf = true, pesanCustom, deviceId } = req.body;
 
-    // Kumpulkan target penerima (bisa dari array targets atau string koma tujuanWa)
+    // Kumpulkan target penerima
     let rawTargets = [];
     if (Array.isArray(targets) && targets.length > 0) {
       rawTargets = targets;
@@ -638,18 +541,18 @@ exports.kirimLaporan = async (req, res) => {
     }
 
     const cleanedTargets = rawTargets
-      .map(n => formatNomorWA(n))
+      .map(n => whatsappManager.cleanPhoneNumber(n))
       .filter(Boolean);
 
     if (cleanedTargets.length === 0) {
       return res.status(400).json({ error: 'Nomor WhatsApp tujuan wajib diisi (minimal 1 kontak).' });
     }
 
-    // Ambil token pengirim berdasarkan deviceId atau default
-    const { token: fonnteToken, device: senderDevice } = await resolveSenderToken(req, deviceId);
-    if (!fonnteToken) {
+    // Ambil device pengirim
+    const senderDevice = await resolveSenderDevice(req, deviceId);
+    if (!senderDevice) {
       return res.status(400).json({
-        error: 'Tidak ada Akun WhatsApp pengirim yang aktif. Silakan tambahkan dan hubungkan akun WhatsApp di menu Pusat WhatsApp.'
+        error: 'Tidak ada Akun WhatsApp pengirim yang terdaftar. Silakan hubungkan akun WhatsApp di menu Pusat WhatsApp.'
       });
     }
 
@@ -673,78 +576,46 @@ exports.kirimLaporan = async (req, res) => {
     const reportSlug = generateReportSlug(pengiriman);
     const pdfDownloadUrl = `${backendUrl}/report/${reportSlug}`;
 
-    // Gunakan pesanCustom jika dikirimkan oleh user, jika tidak gunakan template default
+    // Gunakan pesanCustom jika ada, jika tidak gunakan pesan bawaan
     const pesan = (pesanCustom && pesanCustom.trim())
       ? pesanCustom.trim()
       : generatePesanWA(pengiriman, totalBerangkat, totalDatang, blKg, r1Pct, r2Pct, r3Pct, diffR1, diffR2, diffR3, pdfDownloadUrl);
 
-    // Target format Fonnte: dipisahkan koma untuk broadcast
-    const targetString = cleanedTargets.join(',');
+    let pdfBuffer = null;
+    const filename = `Laporan_CPO_${(pengiriman.kapal?.namaKapal || 'Kapal').replace(/\s/g, '_')}_${pengiriman.nomorBl || pengiriman.id}.pdf`;
 
-    let result;
     if (attachPdf) {
       try {
-        const pdfBuffer = await generatePengirimanPDFBuffer(pengiriman);
-        const filename = `Laporan_CPO_${(pengiriman.kapal?.namaKapal || 'Kapal').replace(/\s/g, '_')}_${pengiriman.nomorBl || pengiriman.id}.pdf`;
-
-        const formData = new FormData();
-        formData.append('target', targetString);
-        formData.append('message', pesan);
-        const file = new File([pdfBuffer], filename, { type: 'application/pdf' });
-        formData.append('file', file);
-        formData.append('filename', filename);
-        formData.append('countryCode', '62');
-
-        const response = await fetch('https://api.fonnte.com/send', {
-          method: 'POST',
-          headers: { 'Authorization': fonnteToken },
-          body: formData,
-        });
-        result = await response.json();
+        pdfBuffer = await generatePengirimanPDFBuffer(pengiriman);
       } catch (pdfErr) {
-        console.error('Error sending PDF attachment with Fonnte, falling back to text:', pdfErr);
-        const response = await fetch('https://api.fonnte.com/send', {
-          method: 'POST',
-          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target: targetString, message: pesan, countryCode: '62' }),
-        });
-        result = await response.json();
+        console.error('Gagal generate PDF buffer, tetap mengirim pesan teks:', pdfErr);
       }
-    } else {
-      const response = await fetch('https://api.fonnte.com/send', {
-        method: 'POST',
-        headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: targetString, message: pesan, countryCode: '62' }),
-      });
-      result = await response.json();
     }
 
-    if (result && result.status) {
-      const penerimaText = cleanedTargets.length > 1
-        ? `${cleanedTargets.length} penerima (Broadcast)`
-        : cleanedTargets[0];
+    // Kirim langsung via WhatsApp Web JS Native Engine (Mendukung broadcast array targets & PDF)
+    const sendResult = await whatsappManager.sendMessage(
+      senderDevice.id,
+      cleanedTargets,
+      pesan,
+      pdfBuffer,
+      filename
+    );
 
-      res.json({
-        success: true,
-        message: `Laporan berhasil dikirim ke ${penerimaText}!`,
-        pesan,
-        target: targetString,
-        totalPenerima: cleanedTargets.length,
-        senderDevice: senderDevice ? senderDevice.nama : 'Default',
-        pdfAttached: attachPdf,
-        fonnteResult: result
-      });
-    } else {
-      const reason = result?.reason || 'Unknown error dari Fonnte';
-      console.warn('Fonnte send failed:', result);
-      res.status(400).json({
-        error: `Gagal kirim WhatsApp: ${reason}.`,
-        pesan,
-        result
-      });
-    }
+    const penerimaText = cleanedTargets.length > 1
+      ? `${cleanedTargets.length} penerima (Broadcast)`
+      : cleanedTargets[0];
+
+    res.json({
+      success: true,
+      message: `Laporan berhasil dikirim ke ${penerimaText}!`,
+      pesan,
+      totalPenerima: cleanedTargets.length,
+      senderDevice: senderDevice.nama,
+      pdfAttached: Boolean(pdfBuffer),
+      sendResult
+    });
   } catch (err) {
     console.error('kirimLaporan error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message || 'Gagal mengirim laporan WhatsApp.' });
   }
 };

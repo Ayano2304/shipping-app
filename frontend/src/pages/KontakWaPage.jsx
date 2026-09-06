@@ -45,10 +45,9 @@ export default function KontakWaPage() {
   const [usersList, setUsersList] = useState([])
   const [loadingDevices, setLoadingDevices] = useState(true)
   const [modalAddDevice, setModalAddDevice] = useState(false)
-  const [deviceAddMode, setDeviceAddMode] = useState('auto') // 'auto' | 'manual'
   const [submittingDevice, setSubmittingDevice] = useState(false)
   const [formDevice, setFormDevice] = useState({
-    nama: '', device: '', token: '', userId: '', isDefault: false, accountToken: ''
+    nama: '', device: '', userId: '', isDefault: false
   })
   
   // QR Modal State
@@ -191,38 +190,18 @@ export default function KontakWaPage() {
 
     try {
       setSubmittingDevice(true)
-      let res
-      if (deviceAddMode === 'auto') {
-        if (!formDevice.device.trim()) {
-          toast.error('Nomor HP / identifier device wajib diisi.')
-          return
-        }
-        res = await addDeviceWAAuto({
-          nama: formDevice.nama,
-          device: formDevice.device,
-          userId: formDevice.userId || undefined,
-          isDefault: formDevice.isDefault,
-          accountToken: formDevice.accountToken || undefined
-        })
-        toast.success(res.data.message || 'Perangkat berhasil dibuat otomatis di Fonnte!')
-      } else {
-        if (!formDevice.token.trim()) {
-          toast.error('Token Fonnte wajib diisi.')
-          return
-        }
-        res = await addDeviceWAManual({
-          nama: formDevice.nama,
-          token: formDevice.token,
-          userId: formDevice.userId || undefined,
-          isDefault: formDevice.isDefault
-        })
-        toast.success(res.data.message || 'Perangkat berhasil ditambahkan!')
-      }
+      const res = await addDeviceWAAuto({
+        nama: formDevice.nama.trim(),
+        device: formDevice.device.trim() || undefined,
+        userId: formDevice.userId || undefined,
+        isDefault: formDevice.isDefault
+      })
+      toast.success(res.data.message || 'Perangkat WhatsApp berhasil dibuat!')
       setModalAddDevice(false)
       setFormDevice({ nama: '', device: '', token: '', userId: '', isDefault: false, accountToken: '' })
       await loadDevices()
 
-      // Langsung tawarkan buka QR Scanner jika baru dibuat
+      // Langsung buka QR Scanner
       if (res?.data?.device?.id) {
         handleOpenQr(res.data.device)
       }
@@ -239,6 +218,12 @@ export default function KontakWaPage() {
 
     try {
       const res = await getDeviceWAQr(device.id)
+      if (res.data?.isConnected) {
+        toast.success(`Perangkat ${device.nama} sudah terhubung! 🎉`)
+        setQrModal({ open: false, device: null, qrUrl: null, loading: false })
+        loadDevices()
+        return
+      }
       setQrModal(prev => ({ ...prev, qrUrl: res.data.url, loading: false }))
 
       // Mulai polling cek status tiap 3 detik
@@ -257,7 +242,7 @@ export default function KontakWaPage() {
       }, 3000)
     } catch (err) {
       setQrModal(prev => ({ ...prev, loading: false }))
-      toast.error(err.response?.data?.error || 'Gagal mengambil QR Code dari Fonnte.')
+      toast.error(err.response?.data?.error || 'Gagal mengambil QR Code WhatsApp.')
     }
   }
 
@@ -401,7 +386,7 @@ export default function KontakWaPage() {
             <div>
               <h1 className="text-xl font-bold text-foreground">Pusat WhatsApp</h1>
               <p className="text-xs text-muted-foreground">
-                Integrasi Gateway Fonnte: Multi-Perangkat Pengirim, Broadcast Kontak Penerima, & Template Laporan
+                WhatsApp Web JS Multi-Session: Perangkat Pengirim Bebas Token, Broadcast Kontak Penerima, & Template Laporan
               </p>
             </div>
           </div>
@@ -871,7 +856,7 @@ export default function KontakWaPage() {
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL: TAMBAH AKUN WHATSAPP BARU (FONNTE AUTO / MANUAL)       */}
+      {/* MODAL: TAMBAH AKUN WHATSAPP BARU (NATIVE MULTI-SESSION)       */}
       {/* ───────────────────────────────────────────────────────────── */}
       {modalAddDevice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
@@ -883,7 +868,7 @@ export default function KontakWaPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-foreground">Tambah Akun WhatsApp Pengirim</h3>
-                  <p className="text-[11px] text-muted-foreground">Fonnte Multi-Device Gateway</p>
+                  <p className="text-[11px] text-muted-foreground">Native WhatsApp Web JS (Bebas Token)</p>
                 </div>
               </div>
               <button
@@ -891,32 +876,6 @@ export default function KontakWaPage() {
                 className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 <X size={16} />
-              </button>
-            </div>
-
-            {/* Mode Switcher */}
-            <div className="grid grid-cols-2 p-1 bg-secondary rounded-xl text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setDeviceAddMode('auto')}
-                className={`py-1.5 rounded-lg transition-all ${
-                  deviceAddMode === 'auto'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                ⚡ Otomatis (API Fonnte)
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeviceAddMode('manual')}
-                className={`py-1.5 rounded-lg transition-all ${
-                  deviceAddMode === 'manual'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                🔑 Input Token Manual
               </button>
             </div>
 
@@ -933,47 +892,19 @@ export default function KontakWaPage() {
                 />
               </div>
 
-              {deviceAddMode === 'auto' ? (
-                <>
-                  <div>
-                    <label className={labelCls}>Nomor HP WhatsApp <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      required
-                      value={formDevice.device}
-                      onChange={e => setFormDevice(f => ({ ...f, device: e.target.value }))}
-                      placeholder="Contoh: 081234567890"
-                      className={inputCls}
-                    />
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Sistem akan membuat device baru di Fonnte secara otomatis via API.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Account Token Fonnte (Opsional jika sudah di .env)</label>
-                    <input
-                      type="text"
-                      value={formDevice.accountToken}
-                      onChange={e => setFormDevice(f => ({ ...f, accountToken: e.target.value }))}
-                      placeholder="Kosongkan jika sudah diatur di .env server"
-                      className={`${inputCls} font-mono`}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <label className={labelCls}>Fonnte Device Token <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    value={formDevice.token}
-                    onChange={e => setFormDevice(f => ({ ...f, token: e.target.value }))}
-                    placeholder="Masukkan token dari menu Device di fonnte.com"
-                    className={`${inputCls} font-mono`}
-                  />
-                </div>
-              )}
+              <div>
+                <label className={labelCls}>Nomor HP WhatsApp (Opsional)</label>
+                <input
+                  type="text"
+                  value={formDevice.device}
+                  onChange={e => setFormDevice(f => ({ ...f, device: e.target.value }))}
+                  placeholder="Contoh: 081234567890 (otomatis terdeteksi saat scan)"
+                  className={inputCls}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Nomor asli akan terdeteksi dan tersinkronisasi otomatis saat QR Code di-scan.
+                </p>
+              </div>
 
               <div>
                 <label className={labelCls}>Tautkan ke User Spesifik (Opsional)</label>
@@ -1018,7 +949,7 @@ export default function KontakWaPage() {
                   className="flex-1 h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
                 >
                   {submittingDevice ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                  <span>Simpan & Scan QR</span>
+                  <span>Simpan & Buka Scan QR</span>
                 </button>
               </div>
             </form>
@@ -1050,7 +981,7 @@ export default function KontakWaPage() {
               {qrModal.loading ? (
                 <div className="flex flex-col items-center justify-center space-y-2 py-10">
                   <Loader2 size={32} className="animate-spin text-primary" />
-                  <span className="text-xs font-semibold text-neutral-600">Menghubungkan ke Fonnte...</span>
+                  <span className="text-xs font-semibold text-neutral-600">Menyiapkan QR Code WhatsApp...</span>
                 </div>
               ) : qrModal.qrUrl ? (
                 <div className="space-y-2">
