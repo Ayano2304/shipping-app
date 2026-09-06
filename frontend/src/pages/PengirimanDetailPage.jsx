@@ -13,7 +13,7 @@ import {
   Anchor, Ship, Info, Contact, Phone, Scale, TrendingUp,
   TrendingDown, Thermometer, CheckCircle2,
   Bookmark, Sparkles, Plus, RotateCcw, Trash2, Clock, X,
-  Smartphone, Send, Users
+  Smartphone, Send, Users, Share2, Copy, ExternalLink, Check
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 
@@ -158,6 +158,14 @@ export default function PengirimanDetailPage() {
   const [newTemplateTitle, setNewTemplateTitle] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
 
+  // WhatsApp Direct Share Link State
+  const [shareModal, setShareModal] = useState(false)
+  const [shareTargetMode, setShareTargetMode] = useState('broadcast') // 'broadcast' (multi-select/forward) | 'direct'
+  const [shareDirectNumber, setShareDirectNumber] = useState('')
+  const [shareSelectedContactId, setShareSelectedContactId] = useState('')
+  const [shareCustomText, setShareCustomText] = useState('')
+  const [copiedText, setCopiedText] = useState(false)
+
   const [activeTab, setActiveTab] = useState('berangkat')
 
   useEffect(() => {
@@ -229,21 +237,23 @@ export default function PengirimanDetailPage() {
 
   // Load Devices, Contacts, and Templates on Modal Open
   useEffect(() => {
-    if (waModal) {
-      setLoadingDevices(true)
-      getDevicesWA()
-        .then(res => {
-          const devs = res.data || []
-          setSenderDevices(devs)
-          if (devs.length > 0) {
-            const myDev = devs.find(d => d.userId === user?.id)
-            const defDev = devs.find(d => d.isDefault)
-            const target = myDev || defDev || devs[0]
-            setSelectedDeviceId(target.id.toString())
-          }
-        })
-        .catch(console.error)
-        .finally(() => setLoadingDevices(false))
+    if (waModal || shareModal) {
+      if (waModal) {
+        setLoadingDevices(true)
+        getDevicesWA()
+          .then(res => {
+            const devs = res.data || []
+            setSenderDevices(devs)
+            if (devs.length > 0) {
+              const myDev = devs.find(d => d.userId === user?.id)
+              const defDev = devs.find(d => d.isDefault)
+              const target = myDev || defDev || devs[0]
+              setSelectedDeviceId(target.id.toString())
+            }
+          })
+          .catch(console.error)
+          .finally(() => setLoadingDevices(false))
+      }
 
       setLoadingContacts(true)
       getKontakWa({ aktifOnly: 'true' })
@@ -259,20 +269,22 @@ export default function PengirimanDetailPage() {
         .catch(console.error)
         .finally(() => setLoadingContacts(false))
 
-      setLoadingTemplates(true)
-      getWATemplates()
-        .then(res => {
-          const list = res.data || []
-          setWaTemplates(list)
-          if (list.length > 0 && !pesanTeks) {
-            setSelectedTemplateId(list[0].id.toString())
-            setPesanTeks(interpolateTemplate(list[0].isi))
-          }
-        })
-        .catch(console.error)
-        .finally(() => setLoadingTemplates(false))
+      if (waModal) {
+        setLoadingTemplates(true)
+        getWATemplates()
+          .then(res => {
+            const list = res.data || []
+            setWaTemplates(list)
+            if (list.length > 0 && !pesanTeks) {
+              setSelectedTemplateId(list[0].id.toString())
+              setPesanTeks(interpolateTemplate(list[0].isi))
+            }
+          })
+          .catch(console.error)
+          .finally(() => setLoadingTemplates(false))
+      }
     }
-  }, [waModal])
+  }, [waModal, shareModal])
 
   const handleSelectTemplate = (templateId) => {
     setSelectedTemplateId(templateId)
@@ -396,6 +408,65 @@ export default function PengirimanDetailPage() {
     } finally { setWaSending(false) }
   }
 
+  // ─── WHATSAPP DIRECT SHARE LINK HANDLERS (NO SERVER BOT REQUIRED) ───
+
+  const getFullShareText = () => {
+    if (pesanTeks && pesanTeks.trim()) return pesanTeks
+    const v = buildVariables()
+    return `*LAPORAN PERHITUNGAN MUATAN CPO*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `*Kapal:* ${v.namaKapal || '-'}\n` +
+      `*No. B/L:* ${v.nomorBl || '-'}\n` +
+      `*Berangkat:* ${v.tglBerangkat}\n` +
+      `*Tiba:* ${v.tglTiba}\n` +
+      `*Petugas Muat (SFAL):* ${v.petugasMuat}\n` +
+      `*Petugas Bongkar (SFBD):* ${v.petugasBongkar}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `*HASIL PERHITUNGAN*\n` +
+      `• B/L (Kontrak): ${v.blKg} KG\n` +
+      `• SFAL (Total Muat): ${v.sfal} KG\n` +
+      `• SFBD (Total Bongkar): ${v.sfbd} KG\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `*ANALISA RASIO*\n` +
+      `• R1 (SFAL vs BL): ${v.r1Diff} KG (${v.r1Pct})\n` +
+      `• R2 (SFBD vs SFAL): ${v.r2Diff} KG (${v.r2Pct})\n` +
+      `• R3 (SFBD vs BL): ${v.r3Diff} KG (${v.r3Pct})\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `${v.linkPdf}\n` +
+      `_Dikirim via Sistem CPO Tanker._`
+  }
+
+  const handleOpenShareModal = () => {
+    setShareCustomText(getFullShareText())
+    setShareModal(true)
+  }
+
+  const handleLaunchWhatsAppShare = () => {
+    const textToSend = shareCustomText || getFullShareText()
+    const encoded = encodeURIComponent(textToSend)
+
+    if (shareTargetMode === 'direct' && shareDirectNumber.trim()) {
+      let clean = shareDirectNumber.replace(/[^0-9]/g, '')
+      if (clean.startsWith('08')) clean = '628' + clean.slice(2)
+      else if (clean.startsWith('8')) clean = '628' + clean.slice(1)
+      window.open(`https://wa.me/${clean}?text=${encoded}`, '_blank')
+    } else {
+      // Universal WhatsApp Share Link (Membuka dialog forward/pilih kontak/grup di WhatsApp)
+      window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank')
+    }
+  }
+
+  const handleCopyShareText = async () => {
+    try {
+      await navigator.clipboard.writeText(shareCustomText || getFullShareText())
+      setCopiedText(true)
+      toast.success('Pesan laporan berhasil disalin ke clipboard!')
+      setTimeout(() => setCopiedText(false), 2000)
+    } catch {
+      toast.error('Gagal menyalin teks.')
+    }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 size={32} className="animate-spin text-primary" /></div>
   if (!data) return <div className="text-center text-muted-foreground py-20">Pengiriman tidak ditemukan.</div>
 
@@ -485,13 +556,23 @@ export default function PengirimanDetailPage() {
                 <span>PDF</span>
               </button>
 
+              <button
+                onClick={handleOpenShareModal}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-all shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                title="Bagikan Laporan via WhatsApp Share Link (Tanpa Bot / Bebas Scan QR)"
+              >
+                <Share2 size={15} />
+                <span>Share WA (Link)</span>
+              </button>
+
               {['ADMIN', 'PETUGAS', 'SURVEYOR'].includes(user?.role) && (
                 <button
                   onClick={() => setWaModal(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-all shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs sm:text-sm font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
+                  title="Kirim Otomatis via Server Bot / Broadcast"
                 >
-                  <MessageCircle size={16} />
-                  <span>Kirim WA</span>
+                  <MessageCircle size={15} className="text-emerald-600 dark:text-emerald-400" />
+                  <span className="hidden sm:inline">Bot WA</span>
                 </button>
               )}
             </>
@@ -1165,32 +1246,220 @@ export default function PengirimanDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2.5 border-t border-border">
               <button
                 type="button"
-                onClick={() => { setWaModal(false); setWaTarget(''); setSelectedContactId('') }}
-                className="px-4 py-2.5 border border-border rounded-xl text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer"
+                onClick={() => {
+                  setWaModal(false)
+                  handleOpenShareModal()
+                }}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-colors cursor-pointer"
+                title="Buka langsung via WhatsApp HP/Web (Bebas Bot / Scan QR)"
               >
-                Batal
+                <Share2 size={13} />
+                <span>Buka via Share Link HP</span>
               </button>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setWaModal(false); setWaTarget(''); setSelectedContactId('') }}
+                  className="px-4 py-2.5 border border-border rounded-xl text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleKirimWA}
+                  disabled={waSending || !pesanTeks.trim() || (broadcastMode ? selectedRecipientIds.length === 0 : !waTarget)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-green-600/20 transition-all cursor-pointer active:scale-95"
+                >
+                  {waSending ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>{broadcastMode ? `Mengirim ke ${selectedRecipientIds.length} Penerima...` : 'Mengirim Laporan...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} />
+                      <span>{broadcastMode ? `🚀 Kirim Broadcast ke ${selectedRecipientIds.length} Penerima` : '🚀 Kirim via Bot Server'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: WHATSAPP DIRECT SHARE LINK (NO SCAN QR / NO BOT)       */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {shareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-lg p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 shadow-xs">
+                  <Share2 size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Bagikan via WhatsApp Share Link</h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Langsung dari aplikasi WhatsApp Anda (Tanpa Login / Bebas Scan QR)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShareModal(false)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Banner Edukasi / Petunjuk */}
+            <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-3 text-xs text-foreground space-y-1">
+              <div className="font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                <Sparkles size={13} />
+                <span>Bebas Kirim ke Banyak Kontak / Grup Sekaligus</span>
+              </div>
+              <p className="text-muted-foreground text-[11px] leading-relaxed">
+                Saat tombol <strong>Buka WhatsApp & Kirim</strong> ditekan, aplikasi WhatsApp di HP/Laptop Anda akan terbuka. Anda bisa langsung <strong>mencentang banyak kontak atau grup kapal sekaligus</strong> pada layar pilihan WhatsApp.
+              </p>
+            </div>
+
+            {/* Pilihan Target Pengiriman */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-foreground block">
+                Pilih Mode Pengiriman:
+              </label>
+              <div className="grid grid-cols-2 p-1 bg-secondary rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setShareTargetMode('broadcast')}
+                  className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    shareTargetMode === 'broadcast'
+                      ? 'bg-card text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Users size={13} />
+                  <span>Pilih di WhatsApp (Multi/Grup)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShareTargetMode('direct')}
+                  className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    shareTargetMode === 'direct'
+                      ? 'bg-card text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Phone size={13} />
+                  <span>Kirim ke Kontak Tertentu</span>
+                </button>
+              </div>
+
+              {/* Sub-form Kontak Spesifik */}
+              {shareTargetMode === 'direct' && (
+                <div className="p-3 bg-secondary/50 border border-border rounded-xl space-y-2.5 animate-fade-in text-xs">
+                  {savedContacts.length > 0 && (
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">
+                        Pilih dari Buku Kontak:
+                      </label>
+                      <select
+                        value={shareSelectedContactId}
+                        onChange={(e) => {
+                          const cId = e.target.value
+                          setShareSelectedContactId(cId)
+                          const c = savedContacts.find(x => x.id === parseInt(cId))
+                          if (c) setShareDirectNumber(c.nomorWa)
+                        }}
+                        className="w-full h-9 px-3 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      >
+                        <option value="">-- Pilih Kontak Tersimpan --</option>
+                        {savedContacts.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.nama} ({c.nomorWa}) - {c.jabatan || c.instansi || 'Kontak'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">
+                      Atau Ketik Nomor WhatsApp:
+                    </label>
+                    <input
+                      type="text"
+                      value={shareDirectNumber}
+                      onChange={(e) => {
+                        setShareDirectNumber(e.target.value)
+                        setShareSelectedContactId('')
+                      }}
+                      placeholder="Contoh: 08123456789 atau 62812..."
+                      className="w-full h-9 px-3 bg-card border border-border rounded-lg text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Preview Teks Pesan */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-foreground">
+                  Isi Pesan Laporan & Link PDF:
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCopyShareText}
+                  className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                >
+                  {copiedText ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+                  <span>{copiedText ? 'Tersalin!' : 'Salin Pesan'}</span>
+                </button>
+              </div>
+              <textarea
+                rows={7}
+                value={shareCustomText}
+                onChange={(e) => setShareCustomText(e.target.value)}
+                className="w-full p-3 bg-secondary/50 border border-border rounded-xl text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 leading-relaxed shadow-xs"
+              />
+            </div>
+
+            {/* Tombol Aksi */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
               <button
                 type="button"
-                onClick={handleKirimWA}
-                disabled={waSending || !pesanTeks.trim() || (broadcastMode ? selectedRecipientIds.length === 0 : !waTarget)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-green-600/20 transition-all cursor-pointer active:scale-95"
+                onClick={handleCopyShareText}
+                className="px-3.5 h-10 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                {waSending ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>{broadcastMode ? `Mengirim ke ${selectedRecipientIds.length} Penerima...` : 'Mengirim Laporan...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Send size={14} />
-                    <span>{broadcastMode ? `🚀 Kirim Broadcast ke ${selectedRecipientIds.length} Penerima` : '🚀 Kirim via WhatsApp'}</span>
-                  </>
-                )}
+                {copiedText ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                <span>{copiedText ? 'Tersalin' : 'Salin Teks'}</span>
               </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShareModal(false)}
+                  className="px-3.5 h-10 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLaunchWhatsAppShare}
+                  className="px-5 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-95"
+                >
+                  <ExternalLink size={15} />
+                  <span>Buka WhatsApp & Kirim</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
