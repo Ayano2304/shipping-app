@@ -42,7 +42,11 @@ export default function LoginPage() {
       toast.success(`Selamat datang, ${data.user.nama}!`)
       navigate('/dashboard')
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Login gagal. Periksa username dan password.')
+      if (!err.response) {
+        toast.error('Gagal terhubung ke backend server. Pastikan backend di port 5000 sedang berjalan.')
+      } else {
+        toast.error(err.response?.data?.error || 'Login gagal. Periksa username dan password.')
+      }
     } finally {
       setLoading(false)
     }
