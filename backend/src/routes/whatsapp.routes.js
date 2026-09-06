@@ -12,7 +12,18 @@ const waLimiter = rateLimit({
   message: { error: 'Terlalu banyak permintaan kirim WhatsApp. Silakan tunggu beberapa saat.' },
 });
 
-// Device & Testing
+// Device Management (Multi-Device Fonnte)
+router.get('/devices', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.getDevices);
+router.post('/devices/auto', auth, roleGuard('ADMIN'), whatsappController.addDeviceAuto);
+router.post('/devices/manual', auth, roleGuard('ADMIN'), whatsappController.addDeviceManual);
+router.get('/devices/:id/qr', auth, roleGuard('ADMIN'), whatsappController.getDeviceQr);
+router.post('/devices/:id/status', auth, roleGuard('ADMIN'), whatsappController.checkDeviceStatusById);
+router.post('/devices/:id/disconnect', auth, roleGuard('ADMIN'), whatsappController.disconnectDevice);
+router.put('/devices/:id/default', auth, roleGuard('ADMIN'), whatsappController.setDefaultDevice);
+router.delete('/devices/:id', auth, roleGuard('ADMIN'), whatsappController.deleteDevice);
+router.post('/devices/:id/test', auth, roleGuard('ADMIN'), waLimiter, whatsappController.testDevice);
+
+// Legacy Device & Testing
 router.post('/status', auth, roleGuard('ADMIN', 'PETUGAS'), whatsappController.checkDeviceStatus);
 router.post('/test', auth, roleGuard('ADMIN', 'PETUGAS'), waLimiter, whatsappController.testKoneksi);
 
@@ -22,7 +33,7 @@ router.post('/templates', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whats
 router.put('/templates/:id', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.updateTemplate);
 router.delete('/templates/:id', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.deleteTemplate);
 
-// Kirim Laporan
+// Kirim Laporan (Single / Broadcast)
 router.post('/kirim/:pengirimanId', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), waLimiter, whatsappController.kirimLaporan);
 
 module.exports = router;

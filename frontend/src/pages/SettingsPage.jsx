@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { changePassword, checkWAStatus } from '../lib/api'
 import toast from 'react-hot-toast'
-import { KeyRound, MessageCircle, Loader2, Check, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
-import { Navigate } from 'react-router-dom'
+import { KeyRound, MessageCircle, Loader2, Check, AlertCircle, CheckCircle2, RefreshCw, Smartphone, ArrowRight } from 'lucide-react'
+import { Navigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 export default function SettingsPage() {
@@ -135,14 +135,42 @@ export default function SettingsPage() {
 
       {/* Fonnte WA Config */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center gap-3 pb-3 border-b border-border">
-          <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
-            <MessageCircle size={16} className="text-green-500" />
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+              <MessageCircle size={16} className="text-green-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Integrasi WhatsApp (Fonnte Gateway)</h3>
+              <p className="text-xs text-muted-foreground">Token akun utama dan manajemen multi-perangkat</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Konfigurasi WhatsApp (Fonnte)</h3>
-            <p className="text-xs text-muted-foreground">Token digunakan untuk kirim laporan via WhatsApp</p>
+          <Link
+            to="/kontak-wa"
+            className="px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold flex items-center gap-1 transition-colors"
+          >
+            <span>Pusat WhatsApp</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        {/* Promo / Banner ke Pusat WhatsApp */}
+        <div className="p-3.5 rounded-xl bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-transparent border border-green-500/25 flex items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Smartphone size={14} className="text-green-600 dark:text-green-400" />
+              <span>Manajemen Multi-WhatsApp & Scan QR di Web</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Sekarang Anda bisa menambahkan banyak nomor pengirim dan scan QR langsung tanpa perlu membuka fonnte.com!
+            </p>
           </div>
+          <Link
+            to="/kontak-wa"
+            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold shrink-0 shadow-xs transition-colors"
+          >
+            Buka Sekarang
+          </Link>
         </div>
 
         <div className="space-y-3">

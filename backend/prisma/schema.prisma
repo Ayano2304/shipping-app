@@ -30,6 +30,7 @@ model User {
   pengirimanCreated    Pengiriman[] @relation("CreatedBy")
   pengirimanDischarged Pengiriman[] @relation("DischargedBy")
   notifikasi           Notifikasi[]
+  deviceWa             DeviceWa[]
 
   @@map("users")
 }
@@ -140,6 +141,22 @@ model TemplatePesan {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("template_pesan")
+}
+
+// Tabel Perangkat WhatsApp (Fonnte Multi-Device)
+model DeviceWa {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(100)
+  token     String   @unique @db.VarChar(255)
+  nomorWa   String?  @map("nomor_wa") @db.VarChar(50)
+  status    String   @default("disconnected") @db.VarChar(50)
+  isDefault Boolean  @default(false) @map("is_default")
+  userId    Int?     @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("device_wa")
 }
 
 enum Role {

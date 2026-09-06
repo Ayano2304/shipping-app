@@ -1,13 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
-import { getKontakWa, createKontakWa, updateKontakWa, deleteKontakWa } from '../lib/api'
+import {
+  getKontakWa, createKontakWa, updateKontakWa, deleteKontakWa,
+  getDevicesWA, addDeviceWAAuto, addDeviceWAManual, getDeviceWAQr,
+  checkDeviceWAStatus, disconnectDeviceWA, setDefaultDeviceWA, deleteDeviceWA, testDeviceWA,
+  getWATemplates, createWATemplate, updateWATemplate, deleteWATemplate,
+  getUsers
+} from '../lib/api'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
 import {
   Contact, Plus, Search, Pencil, Trash2, Loader2, Phone,
   Building2, Briefcase, MessageSquare, CheckCircle2, XCircle,
-  X, AlertTriangle
+  X, AlertTriangle, QrCode, RefreshCw, Send, Smartphone, Star,
+  UserCheck, Shield, Bookmark, Sparkles, Copy, Check
 } from 'lucide-react'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 
 export default function KontakWaPage() {
   const { user } = useAuthStore()
@@ -17,409 +25,1000 @@ export default function KontakWaPage() {
     return <Navigate to="/dashboard" replace />
   }
 
-  const [kontakList, setKontakList] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editId, setEditId] = useState(null)
-  const [confirmDelete, setConfirmDelete] = useState(null)
-  const [submitting, setSubmitting] = useState(false)
+  // Active Tab: 'penerima' | 'pengirim' | 'template'
+  const [activeTab, setActiveTab] = useState('pengirim')
 
-  const [form, setForm] = useState({
-    nama: '',
-    nomorWa: '',
-    jabatan: '',
-    instansi: '',
-    catatan: '',
-    aktif: true,
+  // ─── TAB 1: KONTAK PENERIMA STATE ───
+  const [kontakList, setKontakList] = useState([])
+  const [loadingKontak, setLoadingKontak] = useState(true)
+  const [searchKontak, setSearchKontak] = useState('')
+  const [modalKontakOpen, setModalKontakOpen] = useState(false)
+  const [editKontakId, setEditKontakId] = useState(null)
+  const [confirmDeleteKontak, setConfirmDeleteKontak] = useState(null)
+  const [submittingKontak, setSubmittingKontak] = useState(false)
+  const [formKontak, setFormKontak] = useState({
+    nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true
   })
 
-  const loadData = async () => {
+  // ─── TAB 2: AKUN PENGIRIM (DEVICES) STATE ───
+  const [devicesList, setDevicesList] = useState([])
+  const [usersList, setUsersList] = useState([])
+  const [loadingDevices, setLoadingDevices] = useState(true)
+  const [modalAddDevice, setModalAddDevice] = useState(false)
+  const [deviceAddMode, setDeviceAddMode] = useState('auto') // 'auto' | 'manual'
+  const [submittingDevice, setSubmittingDevice] = useState(false)
+  const [formDevice, setFormDevice] = useState({
+    nama: '', device: '', token: '', userId: '', isDefault: false, accountToken: ''
+  })
+  
+  // QR Modal State
+  const [qrModal, setQrModal] = useState({ open: false, device: null, qrUrl: null, loading: false })
+  const qrPollRef = useRef(null)
+
+  // Test Message Modal State
+  const [testModal, setTestModal] = useState({ open: false, device: null, target: '', loading: false })
+  const [confirmDeleteDevice, setConfirmDeleteDevice] = useState(null)
+
+  // ─── TAB 3: TEMPLATE PESAN STATE ───
+  const [templatesList, setTemplatesList] = useState([])
+  const [loadingTemplates, setLoadingTemplates] = useState(true)
+  const [modalTemplateOpen, setModalTemplateOpen] = useState(false)
+  const [editTemplateId, setEditTemplateId] = useState(null)
+  const [submittingTemplate, setSubmittingTemplate] = useState(false)
+  const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState(null)
+  const [formTemplate, setFormTemplate] = useState({ nama: '', isi: '' })
+
+  // ─── DATA LOADERS ───
+
+  const loadKontak = async () => {
     try {
-      setLoading(true)
-      const res = await getKontakWa({ search })
-      setKontakList(res.data)
-    } catch (err) {
-      toast.error('Gagal memuat daftar kontak WhatsApp.')
+      setLoadingKontak(true)
+      const res = await getKontakWa({ search: searchKontak })
+      setKontakList(res.data || [])
+    } catch {
+      toast.error('Gagal memuat kontak penerima.')
     } finally {
-      setLoading(false)
+      setLoadingKontak(false)
+    }
+  }
+
+  const loadDevices = async () => {
+    try {
+      setLoadingDevices(true)
+      const [devRes, userRes] = await Promise.all([
+        getDevicesWA(),
+        getUsers()
+      ])
+      setDevicesList(devRes.data || [])
+      setUsersList(userRes.data || [])
+    } catch {
+      toast.error('Gagal memuat daftar perangkat WhatsApp.')
+    } finally {
+      setLoadingDevices(false)
+    }
+  }
+
+  const loadTemplates = async () => {
+    try {
+      setLoadingTemplates(true)
+      const res = await getWATemplates()
+      setTemplatesList(res.data || [])
+    } catch {
+      toast.error('Gagal memuat template pesan.')
+    } finally {
+      setLoadingTemplates(false)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [search])
+    loadDevices()
+    loadKontak()
+    loadTemplates()
+  }, [])
 
-  const openAdd = () => {
-    setEditId(null)
-    setForm({
-      nama: '',
-      nomorWa: '',
-      jabatan: '',
-      instansi: '',
-      catatan: '',
-      aktif: true,
-    })
-    setModalOpen(true)
+  useEffect(() => {
+    loadKontak()
+  }, [searchKontak])
+
+  // Cleanup QR Polling on unmount
+  useEffect(() => {
+    return () => {
+      if (qrPollRef.current) clearInterval(qrPollRef.current)
+    }
+  }, [])
+
+  // ─── TAB 1 HANDLERS (KONTAK PENERIMA) ───
+
+  const openAddKontak = () => {
+    setEditKontakId(null)
+    setFormKontak({ nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true })
+    setModalKontakOpen(true)
   }
 
-  const openEdit = (k) => {
-    setEditId(k.id)
-    setForm({
-      nama: k.nama,
-      nomorWa: k.nomorWa,
-      jabatan: k.jabatan || '',
-      instansi: k.instansi || '',
-      catatan: k.catatan || '',
-      aktif: k.aktif,
+  const openEditKontak = (k) => {
+    setEditKontakId(k.id)
+    setFormKontak({
+      nama: k.nama, nomorWa: k.nomorWa, jabatan: k.jabatan || '',
+      instansi: k.instansi || '', catatan: k.catatan || '', aktif: k.aktif
     })
-    setModalOpen(true)
+    setModalKontakOpen(true)
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmitKontak = async (e) => {
     e.preventDefault()
-    if (!form.nama.trim() || !form.nomorWa.trim()) {
+    if (!formKontak.nama.trim() || !formKontak.nomorWa.trim()) {
       toast.error('Nama dan nomor WhatsApp wajib diisi.')
+      return
+    }
+    try {
+      setSubmittingKontak(true)
+      if (editKontakId) {
+        await updateKontakWa(editKontakId, formKontak)
+        toast.success('Kontak WhatsApp berhasil diperbarui!')
+      } else {
+        await createKontakWa(formKontak)
+        toast.success('Kontak WhatsApp baru berhasil ditambahkan!')
+      }
+      setModalKontakOpen(false)
+      loadKontak()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal menyimpan kontak.')
+    } finally {
+      setSubmittingKontak(false)
+    }
+  }
+
+  const handleDeleteKontak = async () => {
+    if (!confirmDeleteKontak) return
+    try {
+      await deleteKontakWa(confirmDeleteKontak.id)
+      toast.success(`Kontak "${confirmDeleteKontak.nama}" berhasil dihapus.`)
+      setConfirmDeleteKontak(null)
+      loadKontak()
+    } catch {
+      toast.error('Gagal menghapus kontak.')
+    }
+  }
+
+  // ─── TAB 2 HANDLERS (AKUN PENGIRIM / DEVICES) ───
+
+  const handleAddDevice = async (e) => {
+    e.preventDefault()
+    if (!formDevice.nama.trim()) {
+      toast.error('Nama label perangkat wajib diisi.')
       return
     }
 
     try {
-      setSubmitting(true)
-      if (editId) {
-        await updateKontakWa(editId, form)
-        toast.success('Kontak WhatsApp berhasil diperbarui!')
+      setSubmittingDevice(true)
+      let res
+      if (deviceAddMode === 'auto') {
+        if (!formDevice.device.trim()) {
+          toast.error('Nomor HP / identifier device wajib diisi.')
+          return
+        }
+        res = await addDeviceWAAuto({
+          nama: formDevice.nama,
+          device: formDevice.device,
+          userId: formDevice.userId || undefined,
+          isDefault: formDevice.isDefault,
+          accountToken: formDevice.accountToken || undefined
+        })
+        toast.success(res.data.message || 'Perangkat berhasil dibuat otomatis di Fonnte!')
       } else {
-        await createKontakWa(form)
-        toast.success('Kontak WhatsApp baru berhasil ditambahkan!')
+        if (!formDevice.token.trim()) {
+          toast.error('Token Fonnte wajib diisi.')
+          return
+        }
+        res = await addDeviceWAManual({
+          nama: formDevice.nama,
+          token: formDevice.token,
+          userId: formDevice.userId || undefined,
+          isDefault: formDevice.isDefault
+        })
+        toast.success(res.data.message || 'Perangkat berhasil ditambahkan!')
       }
-      setModalOpen(false)
-      loadData()
+      setModalAddDevice(false)
+      setFormDevice({ nama: '', device: '', token: '', userId: '', isDefault: false, accountToken: '' })
+      await loadDevices()
+
+      // Langsung tawarkan buka QR Scanner jika baru dibuat
+      if (res?.data?.device?.id) {
+        handleOpenQr(res.data.device)
+      }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Gagal menyimpan kontak WhatsApp.')
+      toast.error(err.response?.data?.error || 'Gagal menambahkan perangkat.')
     } finally {
-      setSubmitting(false)
+      setSubmittingDevice(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirmDelete) return
+  const handleOpenQr = async (device) => {
+    setQrModal({ open: true, device, qrUrl: null, loading: true })
+    if (qrPollRef.current) clearInterval(qrPollRef.current)
+
     try {
-      setSubmitting(true)
-      await deleteKontakWa(confirmDelete.id)
-      toast.success('Kontak berhasil dihapus!')
-      setConfirmDelete(null)
-      loadData()
+      const res = await getDeviceWAQr(device.id)
+      setQrModal(prev => ({ ...prev, qrUrl: res.data.url, loading: false }))
+
+      // Mulai polling cek status tiap 3 detik
+      qrPollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await checkDeviceWAStatus(device.id)
+          if (statusRes.data?.isConnected) {
+            clearInterval(qrPollRef.current)
+            toast.success(`Perangkat ${device.nama} Berhasil Terhubung! 🎉`)
+            setQrModal({ open: false, device: null, qrUrl: null, loading: false })
+            loadDevices()
+          }
+        } catch {
+          // Silent polling error
+        }
+      }, 3000)
     } catch (err) {
-      toast.error('Gagal menghapus kontak.')
-    } finally {
-      setSubmitting(false)
+      setQrModal(prev => ({ ...prev, loading: false }))
+      toast.error(err.response?.data?.error || 'Gagal mengambil QR Code dari Fonnte.')
     }
   }
 
-  const toggleAktif = async (k) => {
+  const handleCloseQrModal = () => {
+    if (qrPollRef.current) clearInterval(qrPollRef.current)
+    setQrModal({ open: false, device: null, qrUrl: null, loading: false })
+    loadDevices()
+  }
+
+  const handleCheckDeviceStatus = async (device) => {
     try {
-      await updateKontakWa(k.id, { aktif: !k.aktif })
-      toast.success(`Kontak ${k.nama} ${!k.aktif ? 'diaktifkan' : 'dinonaktifkan'}.`)
-      loadData()
-    } catch (err) {
-      toast.error('Gagal mengubah status kontak.')
+      const res = await checkDeviceWAStatus(device.id)
+      if (res.data?.isConnected) {
+        toast.success(`Perangkat ${device.nama} TERHUBUNG (${res.data?.device?.nomorWa || 'Aktif'})`)
+      } else {
+        toast.error(`Perangkat ${device.nama} TERPUTUS / Belum di-scan.`)
+      }
+      loadDevices()
+    } catch {
+      toast.error('Gagal mengecek status perangkat.')
     }
   }
+
+  const handleDisconnectDevice = async (device) => {
+    try {
+      await disconnectDeviceWA(device.id)
+      toast.success(`Perangkat ${device.nama} berhasil diputuskan.`)
+      loadDevices()
+    } catch {
+      toast.error('Gagal memutuskan perangkat.')
+    }
+  }
+
+  const handleSetDefaultDevice = async (device) => {
+    try {
+      await setDefaultDeviceWA(device.id)
+      toast.success(`Perangkat ${device.nama} dijadikan pengirim default!`)
+      loadDevices()
+    } catch {
+      toast.error('Gagal mengatur perangkat default.')
+    }
+  }
+
+  const handleDeleteDevice = async () => {
+    if (!confirmDeleteDevice) return
+    try {
+      await deleteDeviceWA(confirmDeleteDevice.id)
+      toast.success(`Perangkat ${confirmDeleteDevice.nama} berhasil dihapus.`)
+      setConfirmDeleteDevice(null)
+      loadDevices()
+    } catch {
+      toast.error('Gagal menghapus perangkat.')
+    }
+  }
+
+  const handleSendTestMessage = async (e) => {
+    e.preventDefault()
+    if (!testModal.target.trim()) {
+      toast.error('Nomor WhatsApp tujuan tes wajib diisi.')
+      return
+    }
+
+    try {
+      setTestModal(prev => ({ ...prev, loading: true }))
+      const res = await testDeviceWA(testModal.device.id, { tujuanWa: testModal.target })
+      toast.success(res.data?.message || 'Pesan tes berhasil dikirim!')
+      setTestModal({ open: false, device: null, target: '', loading: false })
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal mengirim pesan tes.')
+      setTestModal(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  // ─── TAB 3 HANDLERS (TEMPLATE PESAN) ───
+
+  const openAddTemplate = () => {
+    setEditTemplateId(null)
+    setFormTemplate({ nama: '', isi: '' })
+    setModalTemplateOpen(true)
+  }
+
+  const openEditTemplate = (t) => {
+    setEditTemplateId(t.id)
+    setFormTemplate({ nama: t.nama, isi: t.isi })
+    setModalTemplateOpen(true)
+  }
+
+  const handleSubmitTemplate = async (e) => {
+    e.preventDefault()
+    if (!formTemplate.nama.trim() || !formTemplate.isi.trim()) {
+      toast.error('Nama dan isi template wajib diisi.')
+      return
+    }
+
+    try {
+      setSubmittingTemplate(true)
+      if (editTemplateId) {
+        await updateWATemplate(editTemplateId, formTemplate)
+        toast.success('Template pesan berhasil diperbarui!')
+      } else {
+        await createWATemplate(formTemplate)
+        toast.success('Template pesan baru berhasil ditambahkan!')
+      }
+      setModalTemplateOpen(false)
+      loadTemplates()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal menyimpan template.')
+    } finally {
+      setSubmittingTemplate(false)
+    }
+  }
+
+  const handleDeleteTemplate = async () => {
+    if (!confirmDeleteTemplate) return
+    try {
+      await deleteWATemplate(confirmDeleteTemplate.id)
+      toast.success('Template pesan berhasil dihapus.')
+      setConfirmDeleteTemplate(null)
+      loadTemplates()
+    } catch {
+      toast.error('Gagal menghapus template.')
+    }
+  }
+
+  const insertVariableToTemplate = (tag) => {
+    setFormTemplate(prev => ({ ...prev, isi: prev.isi + tag }))
+  }
+
+  const inputCls = "w-full h-10 px-3 bg-secondary border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+  const labelCls = "block text-xs font-semibold text-foreground mb-1.5"
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* 1. Header & Quick Info */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-foreground">Kontak WhatsApp</h2>
-          <p className="text-sm text-muted-foreground">
-            Daftar penerima laporan muatan kapal CPO via WhatsApp
-          </p>
-        </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition shadow-lg shadow-primary/20 self-start sm:self-auto"
-        >
-          <Plus size={16} /> Tambah Kontak
-        </button>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="bg-card border border-border rounded-xl p-3.5 sm:p-4 flex items-center gap-3 shadow-sm">
-        <Search size={16} className="text-muted-foreground shrink-0" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cari berdasarkan nama, nomor WA, jabatan, atau instansi..."
-          className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-        />
-        {search && (
-          <button
-            onClick={() => setSearch('')}
-            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 bg-secondary rounded-md"
-          >
-            Reset
-          </button>
-        )}
-      </div>
-
-      {/* Contacts List / Table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 size={30} className="animate-spin text-primary" />
-          </div>
-        ) : kontakList.length === 0 ? (
-          <div className="py-16 text-center text-muted-foreground space-y-2">
-            <Contact size={36} className="mx-auto opacity-30" />
-            <p className="text-sm font-medium">Belum ada kontak WhatsApp tersimpan.</p>
-            <p className="text-xs">Klik tombol &ldquo;Tambah Kontak&rdquo; di atas untuk mendaftarkan kontak baru.</p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-secondary/30 text-xs font-medium text-muted-foreground">
-                    <th className="text-left px-5 py-3">Nama Kontak</th>
-                    <th className="text-left px-5 py-3">Nomor WhatsApp</th>
-                    <th className="text-left px-5 py-3">Jabatan & Instansi</th>
-                    <th className="text-left px-5 py-3">Catatan</th>
-                    <th className="text-center px-5 py-3">Status</th>
-                    <th className="text-right px-5 py-3">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {kontakList.map((k) => (
-                    <tr key={k.id} className="hover:bg-secondary/20 transition-colors">
-                      <td className="px-5 py-3.5 font-medium text-foreground">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                            {k.nama.slice(0, 2).toUpperCase()}
-                          </div>
-                          <span>{k.nama}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 font-mono text-xs text-foreground">
-                        <span className="inline-flex items-center gap-1.5 font-medium">
-                          <Phone size={13} className="text-muted-foreground" /> {k.nomorWa}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-muted-foreground">
-                        <div className="space-y-0.5">
-                          {k.jabatan && <div className="text-foreground font-medium flex items-center gap-1"><Briefcase size={11} /> {k.jabatan}</div>}
-                          {k.instansi && <div className="text-muted-foreground flex items-center gap-1"><Building2 size={11} /> {k.instansi}</div>}
-                          {!k.jabatan && !k.instansi && <span className="italic">—</span>}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-xs truncate">
-                        {k.catatan || '—'}
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <button
-                          onClick={() => toggleAktif(k)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-colors ${
-                            k.aktif
-                              ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700'
-                              : 'bg-zinc-100 text-zinc-600 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
-                          }`}
-                          title="Klik untuk mengubah status aktif"
-                        >
-                          {k.aktif ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
-                          {k.aktif ? 'Aktif' : 'Nonaktif'}
-                        </button>
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => openEdit(k)}
-                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
-                            title="Edit Kontak"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => setConfirmDelete(k)}
-                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                            title="Hapus Kontak"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0 shadow-xs">
+              <MessageSquare size={20} />
             </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Pusat WhatsApp</h1>
+              <p className="text-xs text-muted-foreground">
+                Integrasi Gateway Fonnte: Multi-Perangkat Pengirim, Broadcast Kontak Penerima, & Template Laporan
+              </p>
+            </div>
+          </div>
+        </div>
 
-            {/* Mobile Cards */}
-            <div className="md:hidden divide-y divide-border/50">
-              {kontakList.map((k) => (
-                <div key={k.id} className="p-4 space-y-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                        {k.nama.slice(0, 2).toUpperCase()}
+        {/* Tab Controls */}
+        <div className="flex items-center p-1 bg-secondary/80 border border-border rounded-2xl shrink-0 self-start sm:self-auto shadow-xs">
+          <button
+            onClick={() => setActiveTab('pengirim')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'pengirim'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Smartphone size={14} className={activeTab === 'pengirim' ? 'text-primary' : ''} />
+            <span>Akun Pengirim</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+              devicesList.some(d => d.status === 'connected')
+                ? 'bg-green-500/20 text-green-700 dark:text-green-300'
+                : 'bg-muted text-muted-foreground'
+            }`}>
+              {devicesList.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('penerima')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'penerima'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Contact size={14} className={activeTab === 'penerima' ? 'text-primary' : ''} />
+            <span>Kontak Penerima</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-muted text-muted-foreground">
+              {kontakList.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('template')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'template'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Bookmark size={14} className={activeTab === 'template' ? 'text-primary' : ''} />
+            <span>Template Pesan</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-muted text-muted-foreground">
+              {templatesList.length}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* TAB 2: AKUN PENGIRIM (MULTI-DEVICE FONNTE & SCAN QR)         */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'pengirim' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Top Bar Pengirim */}
+          <div className="bg-card border border-border rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Smartphone size={16} className="text-primary" />
+                <span>Perangkat WhatsApp Pengirim Laporan</span>
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Hubungkan nomor WhatsApp Admin atau Surveyor untuk mengirim notifikasi sounding & broadcast secara otomatis.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={loadDevices}
+                disabled={loadingDevices}
+                className="px-3 h-9 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                title="Refresh Daftar & Status"
+              >
+                <RefreshCw size={13} className={loadingDevices ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+              <button
+                onClick={() => {
+                  setFormDevice({ nama: '', device: '', token: '', userId: '', isDefault: devicesList.length === 0, accountToken: '' })
+                  setModalAddDevice(true)
+                }}
+                className="flex-1 sm:flex-none px-4 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <Plus size={15} />
+                <span>Tambah WhatsApp Baru</span>
+              </button>
+            </div>
+          </div>
+
+          {/* List of Devices */}
+          {loadingDevices ? (
+            <div className="flex flex-col items-center justify-center h-48 bg-card border border-border rounded-2xl">
+              <Loader2 size={28} className="animate-spin text-primary mb-2" />
+              <div className="text-xs text-muted-foreground">Memuat data perangkat WhatsApp...</div>
+            </div>
+          ) : devicesList.length === 0 ? (
+            <div className="text-center py-16 bg-card border border-dashed border-border rounded-2xl p-6">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-3">
+                <Smartphone size={24} />
+              </div>
+              <h3 className="text-sm font-bold text-foreground">Belum Ada Perangkat WhatsApp Terdaftar</h3>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-4">
+                Tambahkan akun WhatsApp pertama Anda sekarang. Anda bisa menghubungkan nomor Admin atau nomor Surveyor via Fonnte tanpa perlu membuka dashboard Fonnte.
+              </p>
+              <button
+                onClick={() => setModalAddDevice(true)}
+                className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              >
+                <Plus size={14} /> Tambah WhatsApp Sekarang
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {devicesList.map((dev) => {
+                const isConnected = dev.status === 'connected' || dev.status === 'connect'
+                return (
+                  <div
+                    key={dev.id}
+                    className={`bg-card border rounded-2xl p-5 shadow-xs transition-all relative flex flex-col justify-between ${
+                      dev.isDefault
+                        ? 'border-primary/50 shadow-primary/5'
+                        : 'border-border/80'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Header Card */}
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                            isConnected
+                              ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                              : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                          }`}>
+                            <Smartphone size={22} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-foreground leading-tight">
+                                {dev.nama}
+                              </h3>
+                              {dev.isDefault && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/20">
+                                  <Star size={10} className="fill-primary" /> Pengirim Default
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs font-mono text-muted-foreground mt-0.5">
+                              {dev.nomorWa ? `+${dev.nomorWa.replace(/\D/g, '')}` : 'Nomor belum tersinkron'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
+                          isConnected
+                            ? 'bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30'
+                            : 'bg-red-500/10 text-red-700 dark:text-red-300 border border-red-500/20'
+                        }`}>
+                          {isConnected ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                          <span>{isConnected ? 'Terhubung' : 'Terputus'}</span>
+                        </span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-sm text-foreground truncate">{k.nama}</div>
-                        {k.jabatan && <div className="text-xs text-muted-foreground">{k.jabatan} {k.instansi ? `• ${k.instansi}` : ''}</div>}
+
+                      {/* Detail Info User Binding */}
+                      <div className="bg-secondary/60 rounded-xl p-3 text-xs space-y-1.5 border border-border/50 mb-4">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                          <span>Ditautkan ke Petugas:</span>
+                          <span className="font-semibold text-foreground">
+                            {dev.user ? `${dev.user.nama} (${dev.user.role})` : 'Semua Petugas (Umum)'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-muted-foreground">
+                          <span>Device Token:</span>
+                          <span className="font-mono text-[11px] text-foreground/80">
+                            {dev.token ? `${dev.token.slice(0, 8)}••••••••` : '-'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => toggleAktif(k)}
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
-                        k.aktif
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700'
-                          : 'bg-zinc-100 text-zinc-600 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
-                      }`}
-                    >
-                      {k.aktif ? 'Aktif' : 'Nonaktif'}
-                    </button>
+
+                    {/* Action Buttons */}
+                    <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenQr(dev)}
+                          className="px-3 h-8.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95"
+                          title="Scan QR Code WhatsApp"
+                        >
+                          <QrCode size={13} />
+                          <span>Scan QR</span>
+                        </button>
+                        <button
+                          onClick={() => handleCheckDeviceStatus(dev)}
+                          className="px-2.5 h-8.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Cek Status Koneksi Real-time"
+                        >
+                          <RefreshCw size={12} />
+                          <span className="hidden sm:inline">Cek</span>
+                        </button>
+                        <button
+                          onClick={() => setTestModal({ open: true, device: dev, target: '', loading: false })}
+                          className="px-2.5 h-8.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Kirim Pesan Tes"
+                        >
+                          <Send size={12} />
+                          <span className="hidden sm:inline">Tes</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {!dev.isDefault && (
+                          <button
+                            onClick={() => handleSetDefaultDevice(dev)}
+                            className="p-2 rounded-xl text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                            title="Jadikan Pengirim Default"
+                          >
+                            <Star size={15} />
+                          </button>
+                        )}
+                        {isConnected && (
+                          <button
+                            onClick={() => handleDisconnectDevice(dev)}
+                            className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Putuskan Koneksi (Disconnect)"
+                          >
+                            <XCircle size={15} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setConfirmDeleteDevice(dev)}
+                          className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          title="Hapus Perangkat"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
-                  <div className="flex items-center justify-between pt-1 text-xs">
-                    <div className="font-mono text-xs text-foreground font-medium inline-flex items-center gap-1.5">
-                      <Phone size={12} className="text-muted-foreground" /> {k.nomorWa}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* TAB 1: KONTAK PENERIMA LAPORAN (TARGET BROADCAST)             */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'penerima' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Top Bar Penerima */}
+          <div className="bg-card border border-border rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Contact size={16} className="text-primary" />
+                <span>Buku Kontak Penerima Laporan Sounding</span>
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Daftar pihak stakeholder/buyer yang akan menerima broadcast laporan sounding CPO resmi secara berkala.
+              </p>
+            </div>
+            <button
+              onClick={openAddKontak}
+              className="w-full sm:w-auto px-4 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <Plus size={15} />
+              <span>Tambah Kontak Penerima</span>
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchKontak}
+              onChange={(e) => setSearchKontak(e.target.value)}
+              placeholder="Cari nama stakeholder, instansi, jabatan, atau nomor WhatsApp..."
+              className="w-full h-10 pl-10 pr-4 bg-card border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
+            />
+          </div>
+
+          {/* Table of Contacts */}
+          {loadingKontak ? (
+            <div className="flex flex-col items-center justify-center h-48 bg-card border border-border rounded-2xl">
+              <Loader2 size={28} className="animate-spin text-primary mb-2" />
+              <div className="text-xs text-muted-foreground">Memuat kontak penerima...</div>
+            </div>
+          ) : kontakList.length === 0 ? (
+            <div className="text-center py-16 bg-card border border-dashed border-border rounded-2xl p-6">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-3">
+                <Contact size={24} />
+              </div>
+              <h3 className="text-sm font-bold text-foreground">Tidak Ada Kontak Penerima Ditemukan</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
+                {searchKontak ? 'Tidak ada kontak yang cocok dengan kata kunci pencarian.' : 'Tambahkan nomor WhatsApp stakeholder, owner kapal, atau direksi untuk menerima broadcast laporan.'}
+              </p>
+              {!searchKontak && (
+                <button
+                  onClick={openAddKontak}
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                >
+                  <Plus size={14} /> Tambah Kontak Pertama
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-secondary/60 text-muted-foreground font-semibold border-b border-border text-[11px] uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Nama Penerima</th>
+                      <th className="px-4 py-3">Nomor WhatsApp</th>
+                      <th className="px-4 py-3">Jabatan & Instansi</th>
+                      <th className="px-4 py-3">Catatan</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {kontakList.map((k) => (
+                      <tr key={k.id} className="hover:bg-secondary/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-foreground">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                              {k.nama.charAt(0).toUpperCase()}
+                            </div>
+                            <span>{k.nama}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <Phone size={12} className="text-primary shrink-0" />
+                            <span>{k.nomorWa}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-foreground font-medium">{k.jabatan || '-'}</div>
+                          <div className="text-[11px] text-muted-foreground">{k.instansi || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
+                          {k.catatan || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            k.aktif
+                              ? 'bg-green-500/15 text-green-700 dark:text-green-300'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {k.aktif ? 'Aktif' : 'Non-aktif'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => openEditKontak(k)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                              title="Edit Kontak"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteKontak(k)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Hapus Kontak"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* TAB 3: TEMPLATE PESAN LAPORAN                                 */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'template' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Bookmark size={16} className="text-primary" />
+                <span>Template Format Pesan WhatsApp</span>
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Sesuaikan format pesan otomatis yang dikirim saat tombol Kirim Laporan Sounding ditekan.
+              </p>
+            </div>
+            <button
+              onClick={openAddTemplate}
+              className="w-full sm:w-auto px-4 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <Plus size={15} />
+              <span>Tambah Template Baru</span>
+            </button>
+          </div>
+
+          {loadingTemplates ? (
+            <div className="flex flex-col items-center justify-center h-48 bg-card border border-border rounded-2xl">
+              <Loader2 size={28} className="animate-spin text-primary mb-2" />
+              <div className="text-xs text-muted-foreground">Memuat template...</div>
+            </div>
+          ) : templatesList.length === 0 ? (
+            <div className="text-center py-16 bg-card border border-dashed border-border rounded-2xl p-6">
+              <Bookmark size={24} className="text-primary mx-auto mb-2" />
+              <div className="text-sm font-bold text-foreground">Belum ada template pesan</div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {templatesList.map((tpl) => (
+                <div key={tpl.id} className="bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-border">
+                      <div className="flex items-center gap-2">
+                        <Bookmark size={14} className="text-primary" />
+                        <h4 className="text-xs font-bold text-foreground">{tpl.nama}</h4>
+                        {tpl.isDefault && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditTemplate(tpl)}
+                          className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          title="Edit Template"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        {!tpl.isDefault && (
+                          <button
+                            onClick={() => setConfirmDeleteTemplate(tpl)}
+                            className="p-1 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            title="Hapus Template"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEdit(k)}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-amber-500 bg-secondary/50"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(k)}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 bg-secondary/50"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                    <pre className="text-[11px] font-mono p-3 bg-secondary/50 rounded-xl whitespace-pre-wrap text-foreground/90 max-h-48 overflow-y-auto leading-relaxed">
+                      {tpl.isi}
+                    </pre>
                   </div>
                 </div>
               ))}
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* Modal Add / Edit */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-card border border-border rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl animate-fade-in">
-            <button
-              onClick={() => setModalOpen(false)}
-              className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-secondary"
-            >
-              <X size={15} />
-            </button>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: TAMBAH AKUN WHATSAPP BARU (FONNTE AUTO / MANUAL)       */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {modalAddDevice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
+                  <Smartphone size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Tambah Akun WhatsApp Pengirim</h3>
+                  <p className="text-[11px] text-muted-foreground">Fonnte Multi-Device Gateway</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalAddDevice(false)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-            <h3 className="font-bold text-foreground text-base sm:text-lg mb-1">
-              {editId ? 'Edit Kontak WhatsApp' : 'Tambah Kontak WhatsApp'}
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Nomor ini akan muncul pada pilihan penerima saat pengiriman laporan WhatsApp.
-            </p>
+            {/* Mode Switcher */}
+            <div className="grid grid-cols-2 p-1 bg-secondary rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setDeviceAddMode('auto')}
+                className={`py-1.5 rounded-lg transition-all ${
+                  deviceAddMode === 'auto'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                ⚡ Otomatis (API Fonnte)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeviceAddMode('manual')}
+                className={`py-1.5 rounded-lg transition-all ${
+                  deviceAddMode === 'manual'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🔑 Input Token Manual
+              </button>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+            <form onSubmit={handleAddDevice} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Nama Lengkap / Instansi <span className="text-red-500">*</span>
-                </label>
+                <label className={labelCls}>Nama / Label Perangkat <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required
-                  value={form.nama}
-                  onChange={(e) => setForm({ ...form, nama: e.target.value })}
-                  placeholder="Contoh: Bpk. Budi Santoso"
-                  className="w-full h-9 px-3 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  value={formDevice.nama}
+                  onChange={e => setFormDevice(f => ({ ...f, nama: e.target.value }))}
+                  placeholder="Contoh: WA Kantor Pusat, WA Surveyor Dumai"
+                  className={inputCls}
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Nomor WhatsApp <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.nomorWa}
-                  onChange={(e) => setForm({ ...form, nomorWa: e.target.value })}
-                  placeholder="Contoh: 08123456789 atau 628123456789"
-                  className="w-full h-9 px-3 bg-secondary border border-border rounded-lg text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Bisa diawali <code className="bg-secondary px-1 py-0.5 rounded">08...</code> atau <code className="bg-secondary px-1 py-0.5 rounded">628...</code>.
-                </p>
-              </div>
+              {deviceAddMode === 'auto' ? (
+                <>
+                  <div>
+                    <label className={labelCls}>Nomor HP WhatsApp <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      required
+                      value={formDevice.device}
+                      onChange={e => setFormDevice(f => ({ ...f, device: e.target.value }))}
+                      placeholder="Contoh: 081234567890"
+                      className={inputCls}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Sistem akan membuat device baru di Fonnte secara otomatis via API.
+                    </p>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className={labelCls}>Account Token Fonnte (Opsional jika sudah di .env)</label>
+                    <input
+                      type="text"
+                      value={formDevice.accountToken}
+                      onChange={e => setFormDevice(f => ({ ...f, accountToken: e.target.value }))}
+                      placeholder="Kosongkan jika sudah diatur di .env server"
+                      className={`${inputCls} font-mono`}
+                    />
+                  </div>
+                </>
+              ) : (
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">Jabatan / Peran</label>
+                  <label className={labelCls}>Fonnte Device Token <span className="text-red-500">*</span></label>
                   <input
                     type="text"
-                    value={form.jabatan}
-                    onChange={(e) => setForm({ ...form, jabatan: e.target.value })}
-                    placeholder="Contoh: Manager Operasional"
-                    className="w-full h-9 px-3 bg-secondary border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    required
+                    value={formDevice.token}
+                    onChange={e => setFormDevice(f => ({ ...f, token: e.target.value }))}
+                    placeholder="Masukkan token dari menu Device di fonnte.com"
+                    className={`${inputCls} font-mono`}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">Instansi / Perusahaan</label>
-                  <input
-                    type="text"
-                    value={form.instansi}
-                    onChange={(e) => setForm({ ...form, instansi: e.target.value })}
-                    placeholder="Contoh: PT Sawit Jaya"
-                    className="w-full h-9 px-3 bg-secondary border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
-              </div>
+              )}
 
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1">Catatan Tambahan</label>
-                <textarea
-                  rows={2}
-                  value={form.catatan}
-                  onChange={(e) => setForm({ ...form, catatan: e.target.value })}
-                  placeholder="Catatan khusus terkait kontak ini (opsional)..."
-                  className="w-full p-2 bg-secondary border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
-                />
+                <label className={labelCls}>Tautkan ke User Spesifik (Opsional)</label>
+                <select
+                  value={formDevice.userId}
+                  onChange={e => setFormDevice(f => ({ ...f, userId: e.target.value }))}
+                  className={inputCls}
+                >
+                  <option value="">-- Umum (Dapat digunakan oleh semua Petugas/Surveyor) --</option>
+                  {usersList.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.nama} ({u.username} - {u.role})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
-                  id="aktif-checkbox"
-                  checked={form.aktif}
-                  onChange={(e) => setForm({ ...form, aktif: e.target.checked })}
-                  className="w-4 h-4 rounded text-primary focus:ring-primary"
+                  id="isDefault"
+                  checked={formDevice.isDefault}
+                  onChange={e => setFormDevice(f => ({ ...f, isDefault: e.target.checked }))}
+                  className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
                 />
-                <label htmlFor="aktif-checkbox" className="text-xs text-foreground font-medium cursor-pointer">
-                  Kontak Aktif (Tampilkan pada pilihan saat kirim laporan)
+                <label htmlFor="isDefault" className="text-xs font-semibold text-foreground cursor-pointer">
+                  Jadikan sebagai akun pengirim default
                 </label>
               </div>
 
-              <div className="flex gap-2 pt-3 border-t border-border/60">
+              <div className="pt-3 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="flex-1 py-2 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors"
+                  onClick={() => setModalAddDevice(false)}
+                  className="flex-1 h-10 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:opacity-90 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                  disabled={submittingDevice}
+                  className="flex-1 h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
                 >
-                  {submitting ? <Loader2 size={13} className="animate-spin" /> : null}
-                  {editId ? 'Simpan Perubahan' : 'Tambah Kontak'}
+                  {submittingDevice ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  <span>Simpan & Scan QR</span>
                 </button>
               </div>
             </form>
@@ -427,37 +1026,357 @@ export default function KontakWaPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
-          <div className="relative bg-card border border-border rounded-2xl p-5 sm:p-6 w-full max-w-sm shadow-2xl animate-fade-in text-center">
-            <div className="w-11 h-11 rounded-full bg-red-500/15 text-red-500 flex items-center justify-center mx-auto mb-3">
-              <AlertTriangle size={22} />
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: SCAN QR CODE WHATSAPP                                  */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {qrModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-5 text-center">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="text-left">
+                <h3 className="text-sm font-bold text-foreground">Scan QR WhatsApp</h3>
+                <p className="text-xs text-muted-foreground">{qrModal.device?.nama}</p>
+              </div>
+              <button
+                onClick={handleCloseQrModal}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
-            <h3 className="font-bold text-foreground text-base mb-1">Hapus Kontak WhatsApp?</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Apakah Anda yakin ingin menghapus kontak <strong>{confirmDelete.nama}</strong> ({confirmDelete.nomorWa})?
-            </p>
+
+            {/* QR Code Container */}
+            <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-inner min-h-[250px]">
+              {qrModal.loading ? (
+                <div className="flex flex-col items-center justify-center space-y-2 py-10">
+                  <Loader2 size={32} className="animate-spin text-primary" />
+                  <span className="text-xs font-semibold text-neutral-600">Menghubungkan ke Fonnte...</span>
+                </div>
+              ) : qrModal.qrUrl ? (
+                <div className="space-y-2">
+                  <img
+                    src={qrModal.qrUrl.startsWith('data:') ? qrModal.qrUrl : `data:image/png;base64,${qrModal.qrUrl}`}
+                    alt="WhatsApp QR Code"
+                    className="w-56 h-56 object-contain rounded-lg mx-auto"
+                  />
+                  <div className="text-[11px] font-semibold text-neutral-500">
+                    Memantau koneksi otomatis... (polling)
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8 text-neutral-500 text-xs">
+                  Gagal memuat QR Code. Silakan klik tombol Segarkan di bawah.
+                </div>
+              )}
+            </div>
+
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground">Langkah Scan di HP:</p>
+              <p>1. Buka WhatsApp di HP Anda</p>
+              <p>2. Pilih menu <strong>Perangkat Tertaut</strong> → <strong>Tautkan Perangkat</strong></p>
+              <p>3. Arahkan kamera HP ke QR Code di atas</p>
+            </div>
+
             <div className="flex gap-2">
               <button
-                onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-secondary"
+                type="button"
+                onClick={() => handleOpenQr(qrModal.device)}
+                className="flex-1 h-9 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
-                Batal
+                <RefreshCw size={13} />
+                <span>Segarkan QR</span>
               </button>
               <button
-                onClick={handleDelete}
-                disabled={submitting}
-                className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center justify-center gap-1"
+                type="button"
+                onClick={handleCloseQrModal}
+                className="flex-1 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-xs"
               >
-                {submitting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                Hapus
+                Selesai
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: TES KIRIM PESAN                                        */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {testModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-sm p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Kirim Pesan Tes</h3>
+                <p className="text-[11px] text-muted-foreground">Dari: {testModal.device?.nama}</p>
+              </div>
+              <button
+                onClick={() => setTestModal({ open: false, device: null, target: '', loading: false })}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendTestMessage} className="space-y-3">
+              <div>
+                <label className={labelCls}>Nomor WhatsApp Tujuan</label>
+                <input
+                  type="text"
+                  required
+                  value={testModal.target}
+                  onChange={e => setTestModal(m => ({ ...m, target: e.target.value }))}
+                  placeholder="Contoh: 081234567890"
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTestModal({ open: false, device: null, target: '', loading: false })}
+                  className="flex-1 h-9 rounded-xl border border-border bg-secondary text-xs font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={testModal.loading}
+                  className="flex-1 h-9 rounded-xl bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1 shadow-xs disabled:opacity-50"
+                >
+                  {testModal.loading ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                  <span>Kirim Tes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: TAMBAH / EDIT KONTAK PENERIMA                          */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {modalKontakOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="text-sm font-bold text-foreground">
+                {editKontakId ? 'Edit Kontak Penerima' : 'Tambah Kontak Penerima Baru'}
+              </h3>
+              <button
+                onClick={() => setModalKontakOpen(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitKontak} className="space-y-3">
+              <div>
+                <label className={labelCls}>Nama Lengkap <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={formKontak.nama}
+                  onChange={e => setFormKontak(f => ({ ...f, nama: e.target.value }))}
+                  placeholder="Contoh: Bpk. Hendra Gunawan"
+                  className={inputCls}
+                />
+              </div>
+
+              <div>
+                <label className={labelCls}>Nomor WhatsApp <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={formKontak.nomorWa}
+                  onChange={e => setFormKontak(f => ({ ...f, nomorWa: e.target.value }))}
+                  placeholder="Contoh: 08123456789 atau 62812..."
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>Jabatan</label>
+                  <input
+                    type="text"
+                    value={formKontak.jabatan}
+                    onChange={e => setFormKontak(f => ({ ...f, jabatan: e.target.value }))}
+                    placeholder="Contoh: Direktur Ops"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Instansi / Perusahaan</label>
+                  <input
+                    type="text"
+                    value={formKontak.instansi}
+                    onChange={e => setFormKontak(f => ({ ...f, instansi: e.target.value }))}
+                    placeholder="Contoh: PT Sawit Jaya"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>Catatan Tambahan</label>
+                <textarea
+                  rows={2}
+                  value={formKontak.catatan}
+                  onChange={e => setFormKontak(f => ({ ...f, catatan: e.target.value }))}
+                  placeholder="Catatan opsional..."
+                  className="w-full p-2.5 bg-secondary border border-border rounded-xl text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="aktifKontak"
+                  checked={formKontak.aktif}
+                  onChange={e => setFormKontak(f => ({ ...f, aktif: e.target.checked }))}
+                  className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                />
+                <label htmlFor="aktifKontak" className="text-xs font-semibold text-foreground cursor-pointer">
+                  Kontak Aktif (Otomatis masuk dalam daftar broadcast)
+                </label>
+              </div>
+
+              <div className="pt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalKontakOpen(false)}
+                  className="flex-1 h-10 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingKontak}
+                  className="flex-1 h-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+                >
+                  {submittingKontak ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  <span>{editKontakId ? 'Simpan Perubahan' : 'Tambah Kontak'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: TAMBAH / EDIT TEMPLATE PESAN                           */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {modalTemplateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-lg p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="text-sm font-bold text-foreground">
+                {editTemplateId ? 'Edit Template Pesan' : 'Tambah Template Baru'}
+              </h3>
+              <button
+                onClick={() => setModalTemplateOpen(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitTemplate} className="space-y-3">
+              <div>
+                <label className={labelCls}>Nama Template <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={formTemplate.nama}
+                  onChange={e => setFormTemplate(t => ({ ...t, nama: e.target.value }))}
+                  placeholder="Contoh: Format Ringkas Owner, Laporan Khusus Buyer"
+                  className={inputCls}
+                />
+              </div>
+
+              <div>
+                <label className={labelCls}>Variabel Cepat (Klik untuk menyisipkan):</label>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {[
+                    '{namaKapal}', '{nomorBl}', '{blKg}', '{sfal}', '{sfbd}',
+                    '{r1Diff}', '{r1Pct}', '{r2Diff}', '{r2Pct}', '{r3Diff}', '{r3Pct}',
+                    '{petugasMuat}', '{petugasBongkar}', '{linkPdf}'
+                  ].map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => insertVariableToTemplate(tag)}
+                      className="px-2 py-0.5 rounded-lg bg-secondary hover:bg-primary/15 text-foreground hover:text-primary text-[10px] font-mono border border-border transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+
+                <label className={labelCls}>Isi Pesan WhatsApp <span className="text-red-500">*</span></label>
+                <textarea
+                  rows={8}
+                  required
+                  value={formTemplate.isi}
+                  onChange={e => setFormTemplate(t => ({ ...t, isi: e.target.value }))}
+                  placeholder="Tulis susunan teks laporan WhatsApp..."
+                  className="w-full p-3 bg-secondary border border-border rounded-xl text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 leading-relaxed"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalTemplateOpen(false)}
+                  className="flex-1 h-9 rounded-xl border border-border bg-secondary text-xs font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingTemplate}
+                  className="flex-1 h-9 rounded-xl bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1 shadow-xs disabled:opacity-50"
+                >
+                  {submittingTemplate ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  <span>Simpan Template</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Dialogs */}
+      <ConfirmDialog
+        open={Boolean(confirmDeleteDevice)}
+        onClose={() => setConfirmDeleteDevice(null)}
+        onConfirm={handleDeleteDevice}
+        title="Hapus Perangkat WhatsApp"
+        message={`Apakah Anda yakin ingin menghapus perangkat "${confirmDeleteDevice?.nama}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Hapus Perangkat"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmDeleteKontak)}
+        onClose={() => setConfirmDeleteKontak(null)}
+        onConfirm={handleDeleteKontak}
+        title="Hapus Kontak Penerima"
+        message={`Apakah Anda yakin ingin menghapus kontak "${confirmDeleteKontak?.nama}"?`}
+        confirmText="Hapus Kontak"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmDeleteTemplate)}
+        onClose={() => setConfirmDeleteTemplate(null)}
+        onConfirm={handleDeleteTemplate}
+        title="Hapus Template Pesan"
+        message={`Apakah Anda yakin ingin menghapus template "${confirmDeleteTemplate?.nama}"?`}
+        confirmText="Hapus Template"
+        variant="danger"
+      />
     </div>
   )
 }

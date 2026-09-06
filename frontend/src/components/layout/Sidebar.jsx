@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import {
   LayoutDashboard, Ship, ClipboardList, Users, Settings,
-  LogOut, Anchor, X, ChevronRight, Contact
+  LogOut, Anchor, X, ChevronRight, MessageSquare
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -13,7 +13,7 @@ const getNavItems = (role) => {
     { to: '/pengiriman', label: 'Riwayat Pengiriman', icon: ClipboardList },
     ...(role === 'ADMIN' ? [
       { to: '/kapal', label: 'Master Kapal', icon: Ship },
-      { to: '/kontak-wa', label: 'Kontak WhatsApp', icon: Contact },
+      { to: '/kontak-wa', label: 'Pusat WhatsApp', icon: MessageSquare },
       { to: '/users', label: 'Manajemen User', icon: Users },
       { to: '/settings', label: 'Pengaturan', icon: Settings },
     ] : []),

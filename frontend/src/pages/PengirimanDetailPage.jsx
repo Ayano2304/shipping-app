@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getPengirimanById, exportPDF, kirimWA,
-  getKontakWa, getWATemplates, createWATemplate, deleteWATemplate
+  getKontakWa, getWATemplates, createWATemplate, deleteWATemplate, getDevicesWA
 } from '../lib/api'
 import { formatAngka, formatTanggal, toKg, hitungR1, hitungR2, hitungR3 } from '../lib/calc'
 import { downloadBlob } from '../lib/utils'
@@ -12,7 +12,8 @@ import {
   ArrowLeft, FileText, MessageCircle, Pencil, Loader2,
   Anchor, Ship, Info, Contact, Phone, Scale, TrendingUp,
   TrendingDown, Thermometer, CheckCircle2,
-  Bookmark, Sparkles, Plus, RotateCcw, Trash2, Clock, X
+  Bookmark, Sparkles, Plus, RotateCcw, Trash2, Clock, X,
+  Smartphone, Send, Users
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 
@@ -141,6 +142,13 @@ export default function PengirimanDetailPage() {
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [waSending, setWaSending] = useState(false)
 
+  // Multi-Device & Broadcast WhatsApp State
+  const [senderDevices, setSenderDevices] = useState([])
+  const [selectedDeviceId, setSelectedDeviceId] = useState('')
+  const [broadcastMode, setBroadcastMode] = useState(false)
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState([])
+  const [loadingDevices, setLoadingDevices] = useState(false)
+
   // WhatsApp Template & Custom Message State
   const [waTemplates, setWaTemplates] = useState([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
@@ -219,16 +227,33 @@ export default function PengirimanDetailPage() {
     return out
   }
 
-  // Load Contacts and Templates on Modal Open
+  // Load Devices, Contacts, and Templates on Modal Open
   useEffect(() => {
     if (waModal) {
+      setLoadingDevices(true)
+      getDevicesWA()
+        .then(res => {
+          const devs = res.data || []
+          setSenderDevices(devs)
+          if (devs.length > 0) {
+            const myDev = devs.find(d => d.userId === user?.id)
+            const defDev = devs.find(d => d.isDefault)
+            const target = myDev || defDev || devs[0]
+            setSelectedDeviceId(target.id.toString())
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoadingDevices(false))
+
       setLoadingContacts(true)
       getKontakWa({ aktifOnly: 'true' })
         .then(res => {
-          setSavedContacts(res.data || [])
-          if (res.data?.length > 0 && !waTarget) {
-            setSelectedContactId(res.data[0].id.toString())
-            setWaTarget(res.data[0].nomorWa)
+          const list = res.data || []
+          setSavedContacts(list)
+          setSelectedRecipientIds(list.map(c => c.id))
+          if (list.length > 0 && !waTarget) {
+            setSelectedContactId(list[0].id.toString())
+            setWaTarget(list[0].nomorWa)
           }
         })
         .catch(console.error)
@@ -327,24 +352,41 @@ export default function PengirimanDetailPage() {
   }
 
   const handleKirimWA = async () => {
-    if (!waTarget) {
-      toast.error('Nomor tujuan WhatsApp harus diisi.')
-      return
-    }
     if (!pesanTeks.trim()) {
       toast.error('Isi pesan teks tidak boleh kosong.')
       return
     }
 
+    let payload = {
+      attachPdf,
+      pesanCustom: pesanTeks,
+      deviceId: selectedDeviceId ? parseInt(selectedDeviceId) : undefined
+    }
+
+    if (broadcastMode) {
+      if (selectedRecipientIds.length === 0) {
+        toast.error('Pilih minimal 1 kontak penerima untuk broadcast.')
+        return
+      }
+      const targets = savedContacts
+        .filter(c => selectedRecipientIds.includes(c.id))
+        .map(c => c.nomorWa)
+        .filter(Boolean)
+      payload.targets = targets
+    } else {
+      if (!waTarget) {
+        toast.error('Nomor tujuan WhatsApp harus diisi.')
+        return
+      }
+      payload.tujuanWa = waTarget
+    }
+
     const token = localStorage.getItem('fonnte_token')
+    if (token) payload.fonnteToken = token
+
     setWaSending(true)
     try {
-      const res = await kirimWA(id, {
-        tujuanWa: waTarget,
-        attachPdf,
-        pesanCustom: pesanTeks,
-        fonnteToken: token || undefined
-      })
+      const res = await kirimWA(id, payload)
       toast.success(res.data.message || 'Laporan berhasil dikirim via WhatsApp!')
       setWaModal(false)
       setWaTarget('')
@@ -761,96 +803,223 @@ export default function PengirimanDetailPage() {
               </button>
             </div>
 
-            {/* Section 1: Pilihan Kontak & Nomor WA */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-secondary/30 p-3.5 rounded-xl border border-border/80">
-              {/* Kontak Tersimpan */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className={`text-xs font-semibold flex items-center gap-1.5 ${
-                    Boolean(waTarget && !selectedContactId) ? 'text-muted-foreground opacity-60' : 'text-foreground'
-                  }`}>
-                    <Contact size={13} className="text-primary" /> Kontak Penerima:
-                  </label>
-                  {Boolean(waTarget && !selectedContactId) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWaTarget('')
-                        setSelectedContactId('')
-                      }}
-                      className="text-[11px] text-primary hover:underline font-semibold"
-                    >
-                      Batal Manual
-                    </button>
-                  )}
-                </div>
-
-                {loadingContacts ? (
-                  <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
-                    <Loader2 size={13} className="animate-spin text-primary" /> Memuat kontak...
-                  </div>
-                ) : (
-                  <CustomSelect
-                    value={selectedContactId}
-                    onChange={(cid) => {
-                      setSelectedContactId(cid)
-                      if (cid) {
-                        const found = savedContacts.find(c => c.id === parseInt(cid))
-                        if (found) setWaTarget(found.nomorWa)
-                      } else {
-                        setWaTarget('')
-                      }
-                    }}
-                    options={savedContacts.map(c => ({
-                      value: c.id.toString(),
-                      label: c.nama,
-                      icon: Contact,
-                    }))}
-                    placeholder="-- Pilih Kontak Tersimpan --"
-                    icon={Contact}
-                    disabled={Boolean(waTarget && !selectedContactId)}
-                    searchable={savedContacts.length > 5}
-                  />
-                )}
+            {/* Section 0: Pilihan Akun WhatsApp Pengirim (Multi-Device) */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-secondary/50 border border-border/80">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                  <Smartphone size={13} className="text-primary" /> Kirim Menggunakan Akun WhatsApp:
+                </label>
+                <Link to="/kontak-wa" target="_blank" className="text-[11px] text-primary hover:underline font-semibold">
+                  Kelola Akun
+                </Link>
               </div>
-
-              {/* Nomor Tujuan Input Manual */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className={`text-xs font-semibold flex items-center gap-1 ${
-                    Boolean(selectedContactId) ? 'text-muted-foreground opacity-75' : 'text-foreground'
-                  }`}>
-                    <Phone size={12} className="text-muted-foreground" /> Nomor Tujuan WhatsApp:
-                  </label>
-                  {Boolean(selectedContactId) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedContactId('')
-                        setWaTarget('')
-                      }}
-                      className="text-[11px] text-primary hover:underline font-semibold"
-                    >
-                      Ketik Mandiri
-                    </button>
-                  )}
+              {loadingDevices ? (
+                <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+                  <Loader2 size={12} className="animate-spin text-primary" /> Memuat akun pengirim...
                 </div>
-                <input
-                  type="text"
-                  disabled={Boolean(selectedContactId)}
-                  value={waTarget}
-                  onChange={e => {
-                    setWaTarget(e.target.value)
-                    setSelectedContactId('')
-                  }}
-                  placeholder={Boolean(selectedContactId) ? 'Menggunakan kontak tersimpan' : '08123456789 atau 62812...'}
-                  className={`w-full h-10 px-3 border rounded-xl text-xs sm:text-sm font-mono transition-colors ${
-                    Boolean(selectedContactId)
-                      ? 'bg-muted/40 border-border/70 text-muted-foreground cursor-not-allowed opacity-75 select-none'
-                      : 'bg-card border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
-                  }`}
+              ) : senderDevices.length === 0 ? (
+                <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20 flex items-center justify-between">
+                  <span>Belum ada akun WhatsApp terdaftar di sistem.</span>
+                  <Link to="/kontak-wa" target="_blank" className="font-bold underline ml-2">Tambah Akun</Link>
+                </div>
+              ) : (
+                <CustomSelect
+                  value={selectedDeviceId}
+                  onChange={setSelectedDeviceId}
+                  options={senderDevices.map(d => ({
+                    value: d.id.toString(),
+                    label: `${d.nama} (${d.nomorWa ? `+${d.nomorWa.replace(/\D/g, '')}` : 'Belum scan'})${d.isDefault ? ' ⭐ Default' : ''}`,
+                    icon: Smartphone
+                  }))}
+                  placeholder="-- Pilih Akun Pengirim --"
+                  icon={Smartphone}
                 />
+              )}
+            </div>
+
+            {/* Section 1: Pilihan Penerima Laporan (Tunggal vs Broadcast) */}
+            <div className="space-y-2 bg-secondary/30 p-3.5 rounded-xl border border-border/80">
+              <div className="flex items-center justify-between pb-1 border-b border-border/60">
+                <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                  <Contact size={13} className="text-primary" /> Tujuan Laporan:
+                </label>
+                <div className="flex items-center gap-1 p-0.5 bg-secondary rounded-lg text-[11px] font-semibold border border-border/50">
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastMode(false)}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      !broadcastMode ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    👤 Tunggal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastMode(true)}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      broadcastMode ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    📢 Broadcast ({savedContacts.length})
+                  </button>
+                </div>
               </div>
+
+              {broadcastMode ? (
+                /* Mode Broadcast */
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      {selectedRecipientIds.length} dari {savedContacts.length} kontak penerima aktif terpilih
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedRecipientIds.length === savedContacts.length) {
+                          setSelectedRecipientIds([])
+                        } else {
+                          setSelectedRecipientIds(savedContacts.map(c => c.id))
+                        }
+                      }}
+                      className="text-primary hover:underline font-semibold cursor-pointer"
+                    >
+                      {selectedRecipientIds.length === savedContacts.length ? 'Batalkan Semua' : 'Pilih Semua'}
+                    </button>
+                  </div>
+
+                  {savedContacts.length === 0 ? (
+                    <div className="text-xs text-muted-foreground py-4 text-center bg-card rounded-lg border border-dashed border-border">
+                      Tidak ada kontak penerima aktif. Silakan tambahkan di menu <Link to="/kontak-wa" target="_blank" className="text-primary underline">Pusat WhatsApp</Link>.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                      {savedContacts.map(c => {
+                        const checked = selectedRecipientIds.includes(c.id)
+                        return (
+                          <label
+                            key={c.id}
+                            className={`flex items-center justify-between gap-2 p-2 rounded-xl border transition-colors cursor-pointer select-none ${
+                              checked ? 'bg-primary/10 border-primary/30 text-foreground' : 'bg-card border-border/70 text-muted-foreground hover:bg-secondary'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setSelectedRecipientIds(prev => [...prev, c.id])
+                                  } else {
+                                    setSelectedRecipientIds(prev => prev.filter(id => id !== c.id))
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 text-primary rounded border-border shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-semibold text-xs text-foreground truncate">{c.nama}</div>
+                                <div className="text-[10px] text-muted-foreground truncate">{c.instansi || c.jabatan || 'Stakeholder'}</div>
+                              </div>
+                            </div>
+                            <span className="font-mono text-[10px] text-muted-foreground shrink-0">{c.nomorWa}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Mode Tunggal */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  {/* Kontak Tersimpan */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-semibold flex items-center gap-1.5 ${
+                        Boolean(waTarget && !selectedContactId) ? 'text-muted-foreground opacity-60' : 'text-foreground'
+                      }`}>
+                        <Contact size={12} className="text-primary" /> Kontak Tersimpan:
+                      </label>
+                      {Boolean(waTarget && !selectedContactId) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWaTarget('')
+                            setSelectedContactId('')
+                          }}
+                          className="text-[11px] text-primary hover:underline font-semibold"
+                        >
+                          Batal Manual
+                        </button>
+                      )}
+                    </div>
+
+                    {loadingContacts ? (
+                      <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+                        <Loader2 size={13} className="animate-spin text-primary" /> Memuat kontak...
+                      </div>
+                    ) : (
+                      <CustomSelect
+                        value={selectedContactId}
+                        onChange={(cid) => {
+                          setSelectedContactId(cid)
+                          if (cid) {
+                            const found = savedContacts.find(c => c.id === parseInt(cid))
+                            if (found) setWaTarget(found.nomorWa)
+                          } else {
+                            setWaTarget('')
+                          }
+                        }}
+                        options={savedContacts.map(c => ({
+                          value: c.id.toString(),
+                          label: c.nama,
+                          icon: Contact,
+                        }))}
+                        placeholder="-- Pilih Kontak Tersimpan --"
+                        icon={Contact}
+                        disabled={Boolean(waTarget && !selectedContactId)}
+                        searchable={savedContacts.length > 5}
+                      />
+                    )}
+                  </div>
+
+                  {/* Nomor Tujuan Input Manual */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-semibold flex items-center gap-1 ${
+                        Boolean(selectedContactId) ? 'text-muted-foreground opacity-75' : 'text-foreground'
+                      }`}>
+                        <Phone size={12} className="text-muted-foreground" /> Nomor Tujuan WhatsApp:
+                      </label>
+                      {Boolean(selectedContactId) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedContactId('')
+                            setWaTarget('')
+                          }}
+                          className="text-[11px] text-primary hover:underline font-semibold"
+                        >
+                          Ketik Mandiri
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      disabled={Boolean(selectedContactId)}
+                      value={waTarget}
+                      onChange={e => {
+                        setWaTarget(e.target.value)
+                        setSelectedContactId('')
+                      }}
+                      placeholder={Boolean(selectedContactId) ? 'Menggunakan kontak tersimpan' : '08123456789 atau 62812...'}
+                      className={`w-full h-10 px-3 border rounded-xl text-xs sm:text-sm font-mono transition-colors ${
+                        Boolean(selectedContactId)
+                          ? 'bg-muted/40 border-border/70 text-muted-foreground cursor-not-allowed opacity-75 select-none'
+                          : 'bg-card border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
+                      }`}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Section 2: Pilihan Template Pesan */}
@@ -1007,11 +1176,20 @@ export default function PengirimanDetailPage() {
               <button
                 type="button"
                 onClick={handleKirimWA}
-                disabled={waSending || !waTarget || !pesanTeks.trim()}
+                disabled={waSending || !pesanTeks.trim() || (broadcastMode ? selectedRecipientIds.length === 0 : !waTarget)}
                 className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-green-600/20 transition-all cursor-pointer active:scale-95"
               >
-                {waSending ? <Loader2 size={14} className="animate-spin" /> : <MessageCircle size={15} />}
-                <span>{waSending ? 'Mengirim...' : 'Kirim via WhatsApp'}</span>
+                {waSending ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>{broadcastMode ? `Mengirim ke ${selectedRecipientIds.length} Penerima...` : 'Mengirim Laporan...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={14} />
+                    <span>{broadcastMode ? `🚀 Kirim Broadcast ke ${selectedRecipientIds.length} Penerima` : '🚀 Kirim via WhatsApp'}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
