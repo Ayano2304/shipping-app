@@ -210,7 +210,7 @@ export default function KontakWaPage() {
         }
       }, 3000)
     } catch (err) {
-      setQrModal(prev => ({ ...prev, loading: false }))
+      setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
       toast.error(err.response?.data?.error || 'Gagal mengambil QR Code dari Fonnte.')
     } finally {
       setConnectingMyDevice(false)

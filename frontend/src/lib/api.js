@@ -83,7 +83,7 @@ export const testDeviceWA = (id, data) => api.post(`/whatsapp/devices/${id}/test
 
 // User Self-Service Device WhatsApp
 export const getMyDeviceWA = () => api.get('/whatsapp/my-device')
-export const requestMyDeviceWAQr = () => api.post('/whatsapp/my-device/qr')
+export const requestMyDeviceWAQr = (data) => api.post('/whatsapp/my-device/qr', data)
 export const checkMyDeviceWAStatus = () => api.post('/whatsapp/my-device/status')
 export const disconnectMyDeviceWA = () => api.post('/whatsapp/my-device/disconnect')
 export const saveMyDeviceWAToken = (data) => api.post('/whatsapp/my-device/token', data)
