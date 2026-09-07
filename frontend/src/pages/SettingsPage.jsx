@@ -8,9 +8,10 @@ import {
 import toast from 'react-hot-toast'
 import {
   KeyRound, MessageCircle, Loader2, Check, AlertCircle,
-  CheckCircle2, RefreshCw, Shield,
+  CheckCircle2, RefreshCw, Shield, ArrowRight,
   Database, UserCheck, Info
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 export default function SettingsPage() {

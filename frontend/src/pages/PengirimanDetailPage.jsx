@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getPengirimanById, exportPDF, kirimWA,
-  getKontakWa, createKontakWa, getWATemplates, getDevicesWA
+  getKontakWa, getWATemplates, getDevicesWA
 } from '../lib/api'
 import { formatAngka, formatTanggal, toKg, hitungR1, hitungR2, hitungR3 } from '../lib/calc'
 import { downloadBlob } from '../lib/utils'
@@ -336,7 +336,7 @@ export default function PengirimanDetailPage() {
       payload.targets = targets
     } else {
       if (!waTarget) {
-        toast.error('Nomor tujuan WhatsApp harus diisi.')
+        toast.error('Silakan pilih kontak penerima terlebih dahulu.')
         return
       }
       payload.tujuanWa = waTarget
@@ -925,114 +925,54 @@ export default function PengirimanDetailPage() {
                 </div>
               ) : (
                 /* Mode Tunggal */
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                  {/* Kontak Tersimpan */}
+                <div className="space-y-2 pt-1">
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className={`text-xs font-semibold flex items-center gap-1.5 ${
-                        Boolean(waTarget && !selectedContactId) ? 'text-muted-foreground opacity-60' : 'text-foreground'
-                      }`}>
-                        <Contact size={12} className="text-primary" /> Kontak Tersimpan:
-                      </label>
-                      {Boolean(waTarget && !selectedContactId) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWaTarget('')
-                            setSelectedContactId('')
-                          }}
-                          className="text-[11px] text-primary hover:underline font-semibold"
-                        >
-                          Batal Manual
-                        </button>
-                      )}
-                    </div>
+                    <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                      <Contact size={12} className="text-primary" /> Pilih Kontak Penerima:
+                    </label>
 
                     {loadingContacts ? (
                       <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
                         <Loader2 size={13} className="animate-spin text-primary" /> Memuat kontak...
                       </div>
+                    ) : savedContacts.length === 0 ? (
+                      <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-700 dark:text-amber-400 flex items-center justify-between">
+                        <span>Belum ada kontak tersimpan di Buku Kontak Anda.</span>
+                        <Link to="/kontak-wa" target="_blank" className="font-bold underline ml-2">
+                          Tambah Kontak
+                        </Link>
+                      </div>
                     ) : (
-                      <CustomSelect
-                        value={selectedContactId}
-                        onChange={(cid) => {
-                          setSelectedContactId(cid)
-                          if (cid) {
-                            const found = savedContacts.find(c => c.id === parseInt(cid))
-                            if (found) setWaTarget(found.nomorWa)
-                          } else {
-                            setWaTarget('')
-                          }
-                        }}
-                        options={savedContacts.map(c => ({
-                          value: c.id.toString(),
-                          label: c.nama,
-                          icon: Contact,
-                        }))}
-                        placeholder="-- Pilih Kontak Tersimpan --"
-                        icon={Contact}
-                        disabled={Boolean(waTarget && !selectedContactId)}
-                        searchable={savedContacts.length > 5}
-                      />
-                    )}
-                  </div>
-
-                  {/* Nomor Tujuan Input Manual */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className={`text-xs font-semibold flex items-center gap-1 ${
-                        Boolean(selectedContactId) ? 'text-muted-foreground opacity-75' : 'text-foreground'
-                      }`}>
-                        <Phone size={12} className="text-muted-foreground" /> Nomor Tujuan WhatsApp:
-                      </label>
-                      {Boolean(selectedContactId) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedContactId('')
-                            setWaTarget('')
-                          }}
-                          className="text-[11px] text-primary hover:underline font-semibold"
-                        >
-                          Ketik Mandiri
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      disabled={Boolean(selectedContactId)}
-                      value={waTarget}
-                      onChange={e => {
-                        setWaTarget(e.target.value)
-                        setSelectedContactId('')
-                      }}
-                      placeholder={Boolean(selectedContactId) ? 'Menggunakan kontak tersimpan' : '08123456789 atau 62812...'}
-                      className={`w-full h-10 px-3 border rounded-xl text-xs sm:text-sm font-mono transition-colors ${
-                        Boolean(selectedContactId)
-                          ? 'bg-muted/40 border-border/70 text-muted-foreground cursor-not-allowed opacity-75 select-none'
-                          : 'bg-card border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
-                      }`}
-                    />
-                    {!selectedContactId && waTarget && waTarget.trim().length >= 8 && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const nama = window.prompt('Masukkan nama pemilik nomor ini untuk disimpan ke Buku Kontak Anda:', '')
-                          if (nama && nama.trim()) {
-                            try {
-                              const res = await createKontakWa({ nama: nama.trim(), nomorWa: waTarget.trim() })
-                              toast.success(`Kontak "${nama}" berhasil disimpan ke Buku Kontak Anda!`)
-                              setSavedContacts(prev => [res.data, ...prev])
-                              setSelectedContactId(res.data.id.toString())
-                            } catch {
-                              toast.error('Gagal menyimpan kontak baru.')
+                      <div className="space-y-2">
+                        <CustomSelect
+                          value={selectedContactId}
+                          onChange={(cid) => {
+                            setSelectedContactId(cid)
+                            if (cid) {
+                              const found = savedContacts.find(c => c.id === parseInt(cid))
+                              if (found) setWaTarget(found.nomorWa)
+                            } else {
+                              setWaTarget('')
                             }
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer pt-0.5"
-                      >
-                        <Plus size={12} /> Simpan nomor ini ke Buku Kontak Saya
-                      </button>
+                          }}
+                          options={savedContacts.map(c => ({
+                            value: c.id.toString(),
+                            label: `${c.nama} (${c.nomorWa})${c.jabatan || c.instansi ? ` - ${c.jabatan || c.instansi}` : ''}`,
+                            icon: Contact,
+                          }))}
+                          placeholder="-- Pilih Kontak Penerima --"
+                          icon={Contact}
+                          searchable={savedContacts.length > 5}
+                        />
+                        {selectedContactId && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5 bg-secondary/50 rounded-xl border border-border text-xs">
+                            <span className="text-muted-foreground">Nomor WhatsApp Tujuan:</span>
+                            <span className="font-mono font-bold text-foreground">
+                              {savedContacts.find(c => c.id === parseInt(selectedContactId))?.nomorWa}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1252,10 +1192,10 @@ export default function PengirimanDetailPage() {
               {/* Sub-form Kontak Spesifik */}
               {shareTargetMode === 'direct' && (
                 <div className="p-3 bg-secondary/50 border border-border rounded-xl space-y-2.5 animate-fade-in text-xs">
-                  {savedContacts.length > 0 && (
+                  {savedContacts.length > 0 ? (
                     <div>
                       <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">
-                        Pilih dari Buku Kontak:
+                        Pilih Kontak dari Buku Kontak:
                       </label>
                       <select
                         value={shareSelectedContactId}
@@ -1264,6 +1204,7 @@ export default function PengirimanDetailPage() {
                           setShareSelectedContactId(cId)
                           const c = savedContacts.find(x => x.id === parseInt(cId))
                           if (c) setShareDirectNumber(c.nomorWa)
+                          else setShareDirectNumber('')
                         }}
                         className="w-full h-9 px-3 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                       >
@@ -1274,24 +1215,20 @@ export default function PengirimanDetailPage() {
                           </option>
                         ))}
                       </select>
+                      {shareDirectNumber && (
+                        <div className="mt-2 text-[11px] text-muted-foreground font-mono">
+                          Nomor tujuan: <strong className="text-foreground">{shareDirectNumber}</strong>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-amber-600 dark:text-amber-400">
+                      Belum ada kontak tersimpan. Silakan simpan di menu{' '}
+                      <Link to="/kontak-wa" target="_blank" className="font-bold underline">
+                        Buku Kontak & WA
+                      </Link>.
                     </div>
                   )}
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">
-                      Atau Ketik Nomor WhatsApp:
-                    </label>
-                    <input
-                      type="text"
-                      value={shareDirectNumber}
-                      onChange={(e) => {
-                        setShareDirectNumber(e.target.value)
-                        setShareSelectedContactId('')
-                      }}
-                      placeholder="Contoh: 08123456789 atau 62812..."
-                      className="w-full h-9 px-3 bg-card border border-border rounded-lg text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                  </div>
                 </div>
               )}
             </div>
