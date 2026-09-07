@@ -120,7 +120,7 @@ export default function Sidebar({ open, onClose }) {
       {/* Mobile overlay + sidebar with slide-in animation */}
       <div
         className={cn(
-          'md:hidden fixed inset-0 z-50 transition-all duration-300',
+          'md:hidden fixed inset-0 z-50 transition-all duration-300 overflow-hidden',
           open ? 'visible pointer-events-auto' : 'invisible pointer-events-none'
         )}
       >

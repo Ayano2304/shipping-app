@@ -105,7 +105,7 @@ export default function DashboardPage() {
   const totalTonaseMt = totalTonaseKg > 0 ? (totalTonaseKg / 1000).toFixed(2) : '0'
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto w-full min-w-0">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border/80 p-5 rounded-2xl shadow-xs">
         <div className="min-w-0">
@@ -226,9 +226,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ═══════════ CHARTS ═══════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0">
         {/* Tren R2 */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-bold text-sm sm:text-base text-foreground">Tren Rasio Susut Pelayaran (R2)</h3>
@@ -255,7 +255,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Susut per Kapal */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-bold text-sm sm:text-base text-foreground">Efisiensi & Rata-rata Susut per Kapal</h3>
