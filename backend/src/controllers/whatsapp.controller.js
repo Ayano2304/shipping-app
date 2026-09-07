@@ -416,8 +416,14 @@ exports.getDeviceQr = async (req, res) => {
         nomorWa: device.nomorWa || cleanPhone
       });
     } else {
+      let errorMsg = result.reason;
+      if (result.reason && result.reason.toLowerCase().includes('free device already connected')) {
+        errorMsg = 'Akun Fonnte menggunakan Paket Free (maksimal 1 perangkat aktif). Perangkat WhatsApp lain di akun Anda sedang terhubung. Silakan putuskan koneksi perangkat lain terlebih dahulu di menu WhatsApp atau upgrade paket akun Fonnte Anda.';
+      } else if (!errorMsg) {
+        errorMsg = connectType === 'code' ? 'Gagal menghasilkan Kode Pairing dari Fonnte.' : 'Gagal menghasilkan QR Code dari Fonnte. Pastikan device belum terhubung.';
+      }
       res.status(400).json({
-        error: result.reason || (connectType === 'code' ? 'Gagal menghasilkan Kode Pairing dari Fonnte.' : 'Gagal menghasilkan QR Code dari Fonnte. Pastikan device belum terhubung.'),
+        error: errorMsg,
         raw: result
       });
     }
@@ -566,10 +572,38 @@ exports.testDevice = async (req, res) => {
 exports.getMyDevice = async (req, res) => {
   try {
     const userId = req.user.id;
-    const device = await prisma.deviceWa.findFirst({
+    let device = await prisma.deviceWa.findFirst({
       where: { userId },
       include: { user: { select: { id: true, nama: true, username: true } } }
     });
+
+    // Selalu verifikasi status terkini dengan Fonnte agar tidak ada status palsu
+    if (device && device.token) {
+      try {
+        const checkRes = await fetch('https://api.fonnte.com/device', {
+          method: 'POST',
+          headers: { 'Authorization': device.token }
+        });
+        const checkData = await checkRes.json();
+        const isConnected = checkData.status && (checkData.device_status === 'connect' || checkData.device_status === 'connected');
+        const correctStatus = isConnected ? 'connected' : 'disconnected';
+        const correctPhone = checkData.device || device.nomorWa;
+
+        if (device.status !== correctStatus || (checkData.device && device.nomorWa !== correctPhone)) {
+          device = await prisma.deviceWa.update({
+            where: { id: device.id },
+            data: {
+              status: correctStatus,
+              nomorWa: correctPhone
+            },
+            include: { user: { select: { id: true, nama: true, username: true } } }
+          });
+        }
+      } catch (checkErr) {
+        console.warn('Gagal sinkron status getMyDevice dengan Fonnte:', checkErr.message);
+      }
+    }
+
     res.json({ device });
   } catch (err) {
     console.error('getMyDevice error:', err);
@@ -637,6 +671,14 @@ exports.requestMyDeviceQr = async (req, res) => {
                 message: 'Perangkat WhatsApp Anda sudah terhubung!',
                 device: updated
               });
+            } else {
+              // Jika di Fonnte ternyata disconnect, pastikan status di database juga disconnected
+              if (device.status !== 'disconnected') {
+                device = await prisma.deviceWa.update({
+                  where: { id: device.id },
+                  data: { status: 'disconnected' }
+                });
+              }
             }
           }
         } catch (e) {
@@ -750,19 +792,52 @@ exports.requestMyDeviceQr = async (req, res) => {
         nomorWa: device.nomorWa || cleanPhone
       });
     } else {
-      // Jika Fonnte menolak karena device sudah connect
-      if (qrData.reason && qrData.reason.includes('already connect')) {
-        const updated = await prisma.deviceWa.update({
+      // 1. Cek jika paket Free Fonnte terlampaui (perangkat lain di akun ini sudah aktif)
+      if (qrData.reason && qrData.reason.toLowerCase().includes('free device already connected')) {
+        await prisma.deviceWa.update({
           where: { id: device.id },
-          data: { status: 'connected' }
+          data: { status: 'disconnected' }
         });
-        return res.json({
-          success: true,
-          alreadyConnected: true,
-          message: 'Perangkat WhatsApp Anda sudah terhubung!',
-          device: updated
+        return res.status(400).json({
+          error: 'Akun Fonnte menggunakan Paket Free (maksimal 1 perangkat aktif). Perangkat WhatsApp lain di akun ini sedang terhubung. Untuk menghubungkan akun ini, silakan putuskan koneksi WhatsApp perangkat lain terlebih dahulu atau upgrade paket akun Fonnte Anda.',
+          code: 'FREE_DEVICE_LIMIT',
+          raw: qrData
         });
       }
+
+      // 2. Cek jika perangkat INI sendiri yang sudah connect di Fonnte
+      if (qrData.reason && (qrData.reason.toLowerCase() === 'device already connected' || qrData.reason.toLowerCase() === 'already connected')) {
+        try {
+          const verifyRes = await fetch('https://api.fonnte.com/device', {
+            method: 'POST',
+            headers: { 'Authorization': device.token }
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyData.status && (verifyData.device_status === 'connect' || verifyData.device_status === 'connected')) {
+            const updated = await prisma.deviceWa.update({
+              where: { id: device.id },
+              data: {
+                status: 'connected',
+                nomorWa: verifyData.device || device.nomorWa
+              }
+            });
+            return res.json({
+              success: true,
+              alreadyConnected: true,
+              message: 'Perangkat WhatsApp Anda sudah terhubung!',
+              device: updated
+            });
+          }
+        } catch (vErr) {
+          console.warn('Gagal verifikasi status device:', vErr.message);
+        }
+      }
+
+      // Jika gagal lainnya, pastikan status di database tetap disconnected
+      await prisma.deviceWa.update({
+        where: { id: device.id },
+        data: { status: 'disconnected' }
+      });
 
       return res.status(400).json({
         error: qrData.reason || (connectType === 'code' ? 'Gagal menghasilkan Kode Pairing dari Fonnte. Silakan coba lagi beberapa saat.' : 'Gagal menghasilkan QR Code dari Fonnte. Silakan coba lagi beberapa saat.'),
