@@ -567,43 +567,71 @@ exports.getMyDevice = async (req, res) => {
 exports.requestMyDeviceQr = async (req, res) => {
   try {
     const user = req.user;
+    const { nomorWa: inputNomorWa } = req.body || {};
     let device = await prisma.deviceWa.findFirst({ where: { userId: user.id } });
+
+    // Format nomor WhatsApp jika diinput oleh user
+    let formattedPhone = '';
+    if (inputNomorWa && inputNomorWa.trim()) {
+      let raw = inputNomorWa.trim().replace(/[^0-9]/g, '');
+      if (raw.startsWith('08')) raw = '628' + raw.slice(2);
+      else if (raw.startsWith('8')) raw = '628' + raw.slice(1);
+      formattedPhone = raw;
+    } else if (user.kontakWa && user.kontakWa.trim()) {
+      let raw = user.kontakWa.trim().replace(/[^0-9]/g, '');
+      if (raw.startsWith('08')) raw = '628' + raw.slice(2);
+      else if (raw.startsWith('8')) raw = '628' + raw.slice(1);
+      formattedPhone = raw;
+    }
+
+    // Jika user menginput nomor baru yang berbeda dengan user.kontakWa, update profil user
+    if (formattedPhone && formattedPhone !== user.kontakWa) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { kontakWa: formattedPhone }
+      });
+    }
 
     // Cek apakah device ada dan tokennya masih valid di Fonnte
     let isTokenValid = false;
     if (device && device.token) {
-      try {
-        const checkRes = await fetch('https://api.fonnte.com/device', {
-          method: 'POST',
-          headers: { 'Authorization': device.token }
-        });
-        const checkData = await checkRes.json();
-        // Token valid jika status true atau reason bukan token invalid
-        if (checkData.status || (checkData.reason !== 'token invalid' && checkData.reason !== 'device not found')) {
-          isTokenValid = true;
-          // Jika ternyata sudah terhubung di Fonnte
-          if (checkData.device_status === 'connect' || checkData.device_status === 'connected') {
-            const updated = await prisma.deviceWa.update({
-              where: { id: device.id },
-              data: {
-                status: 'connected',
-                nomorWa: checkData.device || device.nomorWa
-              }
-            });
-            return res.json({
-              success: true,
-              alreadyConnected: true,
-              message: 'Perangkat WhatsApp Anda sudah terhubung!',
-              device: updated
-            });
+      // Jika nomor HP yang diminta berbeda dengan nomorWa device sekarang, buat ulang dengan nomor yang benar
+      if (formattedPhone && device.nomorWa && formattedPhone !== device.nomorWa.replace(/[^0-9]/g, '')) {
+        isTokenValid = false;
+      } else {
+        try {
+          const checkRes = await fetch('https://api.fonnte.com/device', {
+            method: 'POST',
+            headers: { 'Authorization': device.token }
+          });
+          const checkData = await checkRes.json();
+          // Token valid jika status true atau reason bukan token invalid
+          if (checkData.status || (checkData.reason !== 'token invalid' && checkData.reason !== 'device not found')) {
+            isTokenValid = true;
+            // Jika ternyata sudah terhubung di Fonnte
+            if (checkData.device_status === 'connect' || checkData.device_status === 'connected') {
+              const updated = await prisma.deviceWa.update({
+                where: { id: device.id },
+                data: {
+                  status: 'connected',
+                  nomorWa: checkData.device || device.nomorWa
+                }
+              });
+              return res.json({
+                success: true,
+                alreadyConnected: true,
+                message: 'Perangkat WhatsApp Anda sudah terhubung!',
+                device: updated
+              });
+            }
           }
+        } catch (e) {
+          console.warn('Gagal cek token device Fonnte:', e.message);
         }
-      } catch (e) {
-        console.warn('Gagal cek token device Fonnte:', e.message);
       }
     }
 
-    // Jika belum punya device atau token lama sudah tidak valid/expired di Fonnte
+    // Jika belum punya device atau token lama sudah tidak valid/expired/nomor berbeda
     if (!device || !isTokenValid) {
       const accountToken = await getFonnteAccountToken();
       if (!accountToken) {
@@ -614,10 +642,25 @@ exports.requestMyDeviceQr = async (req, res) => {
 
       const deviceName = `WA - ${user.nama || user.username}`.substring(0, 30);
       
-      // Generate identifier nomor unik jika user belum ada nomor HP
-      let targetPhone = user.kontakWa ? user.kontakWa.replace(/[^0-9]/g, '') : '';
-      if (!targetPhone || targetPhone.length < 10) {
-        targetPhone = `089${Math.floor(100000000 + Math.random() * 900000000)}`;
+      // Validasi nomor WhatsApp asli
+      let targetPhone = formattedPhone;
+      if (!targetPhone || targetPhone.length < 9) {
+        return res.status(400).json({
+          error: 'Silakan masukkan nomor WhatsApp Anda terlebih dahulu sebelum memindai QR Code.'
+        });
+      }
+
+      // Bersihkan device lama di Fonnte jika ada agar slot akun tidak penuh
+      if (device && device.token) {
+        try {
+          await fetch('https://api.fonnte.com/delete-device', {
+            method: 'POST',
+            headers: { 'Authorization': accountToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: device.token })
+          });
+        } catch (e) {
+          // Silent ignore
+        }
       }
 
       let createRes = await fetch('https://api.fonnte.com/add-device', {
@@ -633,26 +676,9 @@ exports.requestMyDeviceQr = async (req, res) => {
       });
       let createData = await createRes.json();
 
-      // Jika nomor sudah terdaftar di Fonnte sebelumnya, coba lagi dengan nomor unik baru
-      if (!createData.status && createData.reason && createData.reason.includes('already exist')) {
-        targetPhone = `089${Math.floor(100000000 + Math.random() * 900000000)}`;
-        createRes = await fetch('https://api.fonnte.com/add-device', {
-          method: 'POST',
-          headers: {
-            'Authorization': accountToken,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: deviceName,
-            device: targetPhone
-          })
-        });
-        createData = await createRes.json();
-      }
-
       if (!createData.status || !createData.token) {
         return res.status(400).json({
-          error: `Gagal mendaftarkan device ke Fonnte: ${createData.reason || 'Slot device pada akun Fonnte Admin mungkin sudah penuh.'}`,
+          error: `Gagal mendaftarkan nomor ${targetPhone} ke Fonnte: ${createData.reason || 'Periksa nomor WhatsApp atau kuota device akun Fonnte Anda.'}`,
           raw: createData
         });
       }
@@ -697,7 +723,8 @@ exports.requestMyDeviceQr = async (req, res) => {
         success: true,
         url: qrData.url,
         deviceId: device.id,
-        nama: device.nama
+        nama: device.nama,
+        nomorWa: device.nomorWa
       });
     } else {
       // Jika Fonnte menolak karena device sudah connect
@@ -769,21 +796,29 @@ exports.disconnectMyDevice = async (req, res) => {
     const device = await prisma.deviceWa.findFirst({ where: { userId: user.id } });
     if (!device) return res.status(404).json({ error: 'Perangkat WhatsApp tidak ditemukan.' });
 
+    const accountToken = await getFonnteAccountToken();
+
     try {
       await fetch('https://api.fonnte.com/disconnect', {
         method: 'POST',
         headers: { 'Authorization': device.token }
       });
+      if (accountToken) {
+        await fetch('https://api.fonnte.com/delete-device', {
+          method: 'POST',
+          headers: { 'Authorization': accountToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: device.token })
+        });
+      }
     } catch (e) {
       console.warn('Fonnte disconnect error:', e.message);
     }
 
-    const updated = await prisma.deviceWa.update({
-      where: { id: device.id },
-      data: { status: 'disconnected' }
+    await prisma.deviceWa.delete({
+      where: { id: device.id }
     });
 
-    res.json({ success: true, message: 'WhatsApp berhasil diputuskan.', device: updated });
+    res.json({ success: true, message: 'WhatsApp berhasil diputuskan dan siap dihubungkan kembali.' });
   } catch (err) {
     console.error('disconnectMyDevice error:', err);
     res.status(500).json({ error: err.message });

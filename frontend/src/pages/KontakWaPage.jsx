@@ -60,6 +60,7 @@ export default function KontakWaPage() {
   const [myDevice, setMyDevice] = useState(null)
   const [loadingMyDevice, setLoadingMyDevice] = useState(true)
   const [connectingMyDevice, setConnectingMyDevice] = useState(false)
+  const [inputPhone, setInputPhone] = useState(user?.kontakWa || '')
   
   // QR Modal State
   const [qrModal, setQrModal] = useState({ open: false, device: null, qrUrl: null, loading: false })
@@ -173,13 +174,19 @@ export default function KontakWaPage() {
 
   // ─── TAB 2B HANDLERS (WHATSAPP SAYA - NON-ADMIN) ───
 
-  const handleConnectMyDeviceQr = async () => {
+  const handleConnectMyDeviceQr = async (phoneArg) => {
+    const target = phoneArg !== undefined ? phoneArg : inputPhone
+    if (!target || !target.trim() || target.trim().replace(/\D/g, '').length < 9) {
+      toast.error('Silakan masukkan nomor WhatsApp Anda terlebih dahulu (min 9 digit).')
+      return
+    }
+
     setConnectingMyDevice(true)
     setQrModal({ open: true, device: { nama: `WA - ${user?.nama || 'Saya'}` }, qrUrl: null, loading: true, isMyDevice: true })
     if (qrPollRef.current) clearInterval(qrPollRef.current)
 
     try {
-      const res = await requestMyDeviceWAQr()
+      const res = await requestMyDeviceWAQr({ nomorWa: target.trim() })
       if (res.data?.alreadyConnected) {
         toast.success('WhatsApp Anda sudah terhubung! 🎉')
         setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
@@ -860,26 +867,44 @@ export default function KontakWaPage() {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-dashed border-border bg-card space-y-3">
+                <div className="p-4 rounded-xl border border-dashed border-border bg-card space-y-3.5">
                   <div className="font-bold text-xs text-foreground flex items-center gap-1.5">
                     <QrCode size={15} className="text-primary" />
                     <span>Langkah Menghubungkan WhatsApp:</span>
                   </div>
+
+                  <div className="space-y-1.5 bg-secondary/40 p-3 rounded-xl border border-border">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Phone size={13} className="text-primary" /> Nomor WhatsApp HP Anda <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={inputPhone}
+                      onChange={(e) => setInputPhone(e.target.value)}
+                      placeholder="Contoh: 08960536022 atau 62896..."
+                      className="w-full max-w-sm h-10 px-3.5 bg-background border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Nomor ini akan didaftarkan ke server agar identitas pengirim laporan di WhatsApp sesuai dengan nomor asli Anda.
+                    </p>
+                  </div>
+
                   <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1">
-                    <li>Klik tombol hijau <strong>"Scan Barcode QR Sekarang"</strong> di bawah.</li>
+                    <li>Ketik nomor WhatsApp Anda pada kotak di atas, lalu klik <strong>"Generate & Scan Barcode QR"</strong>.</li>
                     <li>Buka aplikasi WhatsApp di HP Anda.</li>
                     <li>Buka menu <strong>Perangkat Tertaut (Linked Devices)</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
                     <li>Arahkan kamera HP Anda ke Barcode QR yang muncul di layar ini.</li>
                   </ol>
+
                   <div className="pt-2">
                     <button
                       type="button"
-                      onClick={handleConnectMyDeviceQr}
+                      onClick={() => handleConnectMyDeviceQr()}
                       disabled={connectingMyDevice}
                       className="w-full sm:w-auto px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
                       {connectingMyDevice ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={15} />}
-                      <span>Scan Barcode QR Sekarang</span>
+                      <span>Generate & Scan Barcode QR</span>
                     </button>
                   </div>
                 </div>
