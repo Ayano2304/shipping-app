@@ -14,7 +14,7 @@ import {
   Contact, Plus, Search, Pencil, Trash2, Loader2, Phone,
   Building2, Briefcase, MessageSquare, CheckCircle2, XCircle,
   X, AlertTriangle, QrCode, RefreshCw, Send, Smartphone, Star,
-  UserCheck, Shield, Bookmark, Sparkles, Copy, Check, Lock
+  UserCheck, Shield, Bookmark, Sparkles, Copy, Check, Lock, Hash
 } from 'lucide-react'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 
@@ -62,8 +62,18 @@ export default function KontakWaPage() {
   const [connectingMyDevice, setConnectingMyDevice] = useState(false)
   const [inputPhone, setInputPhone] = useState(user?.kontakWa || '')
   
-  // QR Modal State
-  const [qrModal, setQrModal] = useState({ open: false, device: null, qrUrl: null, loading: false })
+  // QR & Pairing Code Modal State
+  const [connectMethod, setConnectMethod] = useState('code') // 'code' | 'qr'
+  const [qrModal, setQrModal] = useState({
+    open: false,
+    device: null,
+    type: 'code',
+    qrUrl: null,
+    code: null,
+    loading: false,
+    isMyDevice: false,
+    copied: false
+  })
   const qrPollRef = useRef(null)
 
   // Test Message Modal State
@@ -174,26 +184,42 @@ export default function KontakWaPage() {
 
   // ─── TAB 2B HANDLERS (WHATSAPP SAYA - NON-ADMIN) ───
 
-  const handleConnectMyDeviceQr = async (phoneArg) => {
+  const handleConnectMyDevice = async (phoneArg, typeArg) => {
     const target = phoneArg !== undefined ? phoneArg : inputPhone
+    const method = typeArg || connectMethod || 'code'
     if (!target || !target.trim() || target.trim().replace(/\D/g, '').length < 9) {
       toast.error('Silakan masukkan nomor WhatsApp Anda terlebih dahulu (min 9 digit).')
       return
     }
 
     setConnectingMyDevice(true)
-    setQrModal({ open: true, device: { nama: `WA - ${user?.nama || 'Saya'}` }, qrUrl: null, loading: true, isMyDevice: true })
+    setQrModal({
+      open: true,
+      device: { nama: `WA - ${user?.nama || 'Saya'}`, nomorWa: target.trim() },
+      type: method,
+      qrUrl: null,
+      code: null,
+      loading: true,
+      isMyDevice: true,
+      copied: false
+    })
     if (qrPollRef.current) clearInterval(qrPollRef.current)
 
     try {
-      const res = await requestMyDeviceWAQr({ nomorWa: target.trim() })
+      const res = await requestMyDeviceWAQr({ nomorWa: target.trim(), type: method })
       if (res.data?.alreadyConnected) {
         toast.success('WhatsApp Anda sudah terhubung! 🎉')
-        setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
+        setQrModal({ open: false, device: null, type: 'code', qrUrl: null, code: null, loading: false, isMyDevice: false, copied: false })
         loadMyDevice()
         return
       }
-      setQrModal(prev => ({ ...prev, qrUrl: res.data.url, loading: false }))
+      setQrModal(prev => ({
+        ...prev,
+        type: res.data.type || method,
+        qrUrl: res.data.url,
+        code: res.data.code,
+        loading: false
+      }))
 
       // Polling cek status tiap 3 detik
       qrPollRef.current = setInterval(async () => {
@@ -202,7 +228,7 @@ export default function KontakWaPage() {
           if (statusRes.data?.connected) {
             clearInterval(qrPollRef.current)
             toast.success('WhatsApp Anda Berhasil Terhubung! 🎉')
-            setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
+            setQrModal({ open: false, device: null, type: 'code', qrUrl: null, code: null, loading: false, isMyDevice: false, copied: false })
             loadMyDevice()
           }
         } catch {
@@ -210,10 +236,31 @@ export default function KontakWaPage() {
         }
       }, 3000)
     } catch (err) {
-      setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
-      toast.error(err.response?.data?.error || 'Gagal mengambil QR Code dari Fonnte.')
+      setQrModal({ open: false, device: null, type: 'code', qrUrl: null, code: null, loading: false, isMyDevice: false, copied: false })
+      toast.error(err.response?.data?.error || 'Gagal menghasilkan kode / QR dari Fonnte.')
     } finally {
       setConnectingMyDevice(false)
+    }
+  }
+
+  const handleConnectMyDeviceQr = (phoneArg) => handleConnectMyDevice(phoneArg, 'qr')
+
+  const handleCopyPairingCode = () => {
+    if (!qrModal.code) return
+    navigator.clipboard.writeText(qrModal.code)
+    setQrModal(prev => ({ ...prev, copied: true }))
+    toast.success('Kode pairing WhatsApp berhasil disalin!')
+    setTimeout(() => {
+      setQrModal(prev => ({ ...prev, copied: false }))
+    }, 2500)
+  }
+
+  const handleSwitchConnectMethod = (newMethod) => {
+    if (qrModal.loading) return
+    if (qrModal.isMyDevice || !isAdmin) {
+      handleConnectMyDevice(inputPhone, newMethod)
+    } else if (qrModal.device) {
+      handleOpenQr(qrModal.device, newMethod)
     }
   }
 
@@ -316,13 +363,28 @@ export default function KontakWaPage() {
     }
   }
 
-  const handleOpenQr = async (device) => {
-    setQrModal({ open: true, device, qrUrl: null, loading: true })
+  const handleOpenQr = async (device, typeArg = 'code') => {
+    setQrModal({
+      open: true,
+      device,
+      type: typeArg,
+      qrUrl: null,
+      code: null,
+      loading: true,
+      isMyDevice: false,
+      copied: false
+    })
     if (qrPollRef.current) clearInterval(qrPollRef.current)
 
     try {
-      const res = await getDeviceWAQr(device.id)
-      setQrModal(prev => ({ ...prev, qrUrl: res.data.url, loading: false }))
+      const res = await getDeviceWAQr(device.id, { type: typeArg })
+      setQrModal(prev => ({
+        ...prev,
+        type: res.data.type || typeArg,
+        qrUrl: res.data.url,
+        code: res.data.code,
+        loading: false
+      }))
 
       // Mulai polling cek status tiap 3 detik
       qrPollRef.current = setInterval(async () => {
@@ -331,7 +393,7 @@ export default function KontakWaPage() {
           if (statusRes.data?.isConnected) {
             clearInterval(qrPollRef.current)
             toast.success(`Perangkat ${device.nama} Berhasil Terhubung! 🎉`)
-            setQrModal({ open: false, device: null, qrUrl: null, loading: false })
+            setQrModal({ open: false, device: null, type: 'code', qrUrl: null, code: null, loading: false, isMyDevice: false, copied: false })
             loadDevices()
           }
         } catch {
@@ -340,14 +402,14 @@ export default function KontakWaPage() {
       }, 3000)
     } catch (err) {
       setQrModal(prev => ({ ...prev, loading: false }))
-      toast.error(err.response?.data?.error || 'Gagal mengambil QR Code dari Fonnte.')
+      toast.error(err.response?.data?.error || 'Gagal menghasilkan kode / QR dari Fonnte.')
     }
   }
 
   const handleCloseQrModal = () => {
     if (qrPollRef.current) clearInterval(qrPollRef.current)
     const wasMyDevice = qrModal.isMyDevice
-    setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
+    setQrModal({ open: false, device: null, type: 'code', qrUrl: null, code: null, loading: false, isMyDevice: false, copied: false })
     if (wasMyDevice || !isAdmin) {
       loadMyDevice()
     } else {
@@ -500,11 +562,11 @@ export default function KontakWaPage() {
         </div>
 
         {/* Tab Controls */}
-        <div className="flex items-center p-1 bg-secondary/80 border border-border rounded-2xl shrink-0 self-start sm:self-auto shadow-xs">
+        <div className="flex items-center gap-1 p-1 bg-secondary/80 border border-border rounded-2xl shrink-0 self-start sm:self-auto shadow-xs overflow-x-auto max-w-full scrollbar-none">
           {isAdmin ? (
             <button
               onClick={() => setActiveTab('pengirim')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === 'pengirim'
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -523,7 +585,7 @@ export default function KontakWaPage() {
           ) : (
             <button
               onClick={() => setActiveTab('my-device')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === 'my-device'
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -543,7 +605,7 @@ export default function KontakWaPage() {
 
           <button
             onClick={() => setActiveTab('penerima')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'penerima'
                 ? 'bg-card text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
@@ -558,7 +620,7 @@ export default function KontakWaPage() {
 
           <button
             onClick={() => setActiveTab('template')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'template'
                 ? 'bg-card text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
@@ -856,13 +918,67 @@ export default function KontakWaPage() {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-dashed border-border bg-card space-y-3.5">
-                  <div className="font-bold text-xs text-foreground flex items-center gap-1.5">
-                    <QrCode size={15} className="text-primary" />
-                    <span>Langkah Menghubungkan WhatsApp:</span>
+                <div className="p-4 sm:p-5 rounded-xl border border-dashed border-border bg-card space-y-4">
+                  {/* Pilihan Metode: Kode vs QR */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-foreground">
+                      Pilih Cara Menghubungkan WhatsApp:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setConnectMethod('code')}
+                        className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                          connectMethod === 'code'
+                            ? 'bg-primary/10 border-primary text-foreground ring-1 ring-primary/40'
+                            : 'bg-secondary/40 border-border text-muted-foreground hover:bg-secondary/70'
+                        }`}
+                      >
+                        <div className={`p-2 rounded-lg shrink-0 ${connectMethod === 'code' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                          <Hash size={16} />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold flex items-center gap-1.5">
+                            <span>Tautkan dengan Kode</span>
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
+                              Rekomendasi HP
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                            Gunakan kode 8-digit langsung di WhatsApp tanpa perlu scan kamera.
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setConnectMethod('qr')}
+                        className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                          connectMethod === 'qr'
+                            ? 'bg-primary/10 border-primary text-foreground ring-1 ring-primary/40'
+                            : 'bg-secondary/40 border-border text-muted-foreground hover:bg-secondary/70'
+                        }`}
+                      >
+                        <div className={`p-2 rounded-lg shrink-0 ${connectMethod === 'qr' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                          <QrCode size={16} />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold flex items-center gap-1.5">
+                            <span>Scan Barcode QR</span>
+                            <span className="px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
+                              Laptop / PC
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                            Scan barcode QR di layar laptop menggunakan kamera WhatsApp di HP.
+                          </p>
+                        </div>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5 bg-secondary/40 p-3 rounded-xl border border-border">
+                  {/* Input Nomor HP */}
+                  <div className="space-y-1.5 bg-secondary/40 p-3.5 rounded-xl border border-border">
                     <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                       <Phone size={13} className="text-primary" /> Nomor WhatsApp HP Anda <span className="text-red-500">*</span>
                     </label>
@@ -874,26 +990,57 @@ export default function KontakWaPage() {
                       className="w-full max-w-sm h-10 px-3.5 bg-background border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      Nomor ini akan didaftarkan ke server agar identitas pengirim laporan di WhatsApp sesuai dengan nomor asli Anda.
+                      Nomor ini akan didaftarkan ke server Fonnte agar WhatsApp Anda dapat diverifikasi dengan aman.
                     </p>
                   </div>
 
-                  <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1">
-                    <li>Ketik nomor WhatsApp Anda pada kotak di atas, lalu klik <strong>"Generate & Scan Barcode QR"</strong>.</li>
-                    <li>Buka aplikasi WhatsApp di HP Anda.</li>
-                    <li>Buka menu <strong>Perangkat Tertaut (Linked Devices)</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
-                    <li>Arahkan kamera HP Anda ke Barcode QR yang muncul di layar ini.</li>
-                  </ol>
+                  {/* Panduan Langkah Sesuai Metode */}
+                  {connectMethod === 'code' ? (
+                    <div className="space-y-1.5 bg-muted/40 p-3.5 rounded-xl border border-border/60">
+                      <div className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-1">
+                        <Smartphone size={14} className="text-primary" />
+                        <span>Langkah Tautkan dengan Kode di WhatsApp HP:</span>
+                      </div>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1 leading-relaxed">
+                        <li>Ketik nomor WhatsApp Anda di atas, lalu klik <strong>"Dapatkan Kode Pairing"</strong>.</li>
+                        <li>Buka aplikasi WhatsApp di HP Anda → Menu titik tiga / Pengaturan.</li>
+                        <li>Pilih <strong>Perangkat Tertaut</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
+                        <li>Ketuk pilihan <strong>"Tautkan dengan nomor telepon saja"</strong> (Link with phone number instead) di bagian paling bawah layar HP.</li>
+                        <li>Ketik 8 digit kode yang muncul di layar ini ke WhatsApp Anda.</li>
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 bg-muted/40 p-3.5 rounded-xl border border-border/60">
+                      <div className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-1">
+                        <QrCode size={14} className="text-primary" />
+                        <span>Langkah Scan Barcode QR di Laptop:</span>
+                      </div>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1 leading-relaxed">
+                        <li>Ketik nomor WhatsApp Anda di atas, lalu klik <strong>"Generate & Scan Barcode QR"</strong>.</li>
+                        <li>Buka aplikasi WhatsApp di HP Anda → Menu titik tiga / Pengaturan.</li>
+                        <li>Pilih <strong>Perangkat Tertaut</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
+                        <li>Arahkan kamera WhatsApp HP Anda ke Barcode QR yang muncul di layar ini.</li>
+                      </ol>
+                    </div>
+                  )}
 
                   <div className="pt-2">
                     <button
                       type="button"
-                      onClick={() => handleConnectMyDeviceQr()}
+                      onClick={() => handleConnectMyDevice(inputPhone, connectMethod)}
                       disabled={connectingMyDevice}
                       className="w-full sm:w-auto px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
-                      {connectingMyDevice ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={15} />}
-                      <span>Generate & Scan Barcode QR</span>
+                      {connectingMyDevice ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : connectMethod === 'code' ? (
+                        <Hash size={15} />
+                      ) : (
+                        <QrCode size={15} />
+                      )}
+                      <span>
+                        {connectMethod === 'code' ? 'Dapatkan Kode Pairing (HP)' : 'Generate & Scan Barcode QR'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -967,102 +1114,207 @@ export default function KontakWaPage() {
               )}
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-secondary/60 text-muted-foreground font-semibold border-b border-border text-[11px] uppercase tracking-wider">
-                    <tr>
-                      <th className="px-4 py-3">Nama Penerima</th>
-                      <th className="px-4 py-3">Nomor WhatsApp</th>
-                      <th className="px-4 py-3">Jabatan & Instansi</th>
-                      <th className="px-4 py-3">Catatan</th>
-                      <th className="px-4 py-3 text-center">Status</th>
-                      <th className="px-4 py-3 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {kontakList.map((k) => {
-                      const canEdit = isAdmin || k.userId === user?.id
-                      return (
-                        <tr key={k.id} className="hover:bg-secondary/30 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-foreground">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                                {k.nama.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span>{k.nama}</span>
-                                  {k.isGlobal ? (
-                                    <span className="px-2 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
-                                      🏢 Kantor
-                                    </span>
-                                  ) : k.userId === user?.id ? (
-                                    <span className="px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
-                                      👤 Pribadi
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.2 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
-                                      👤 {k.user?.nama || 'Petugas'}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-muted-foreground">
-                            <div className="flex items-center gap-1.5">
-                              <Phone size={12} className="text-primary shrink-0" />
-                              <span>{k.nomorWa}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-foreground font-medium">{k.jabatan || '-'}</div>
-                            <div className="text-[11px] text-muted-foreground">{k.instansi || '-'}</div>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
-                            {k.catatan || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              k.aktif
-                                ? 'bg-green-500/15 text-green-700 dark:text-green-300'
-                                : 'bg-muted text-muted-foreground'
-                            }`}>
-                              {k.aktif ? 'Aktif' : 'Non-aktif'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {canEdit ? (
-                                <>
-                                  <button
-                                    onClick={() => openEditKontak(k)}
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-                                    title="Edit Kontak"
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmDeleteKontak(k)}
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                                    title="Hapus Kontak"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </>
+            <div className="space-y-3">
+              {/* Mobile Card List (Screen < md) */}
+              <div className="block md:hidden space-y-3">
+                {kontakList.map((k) => {
+                  const canEdit = isAdmin || k.userId === user?.id
+                  const cleanPhone = k.nomorWa ? k.nomorWa.replace(/\D/g, '') : ''
+                  const waLink = `https://wa.me/${cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone}`
+
+                  return (
+                    <div key={k.id} className="p-4 bg-card border border-border rounded-2xl shadow-xs space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                            {k.nama.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-sm text-foreground">{k.nama}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                              {k.isGlobal ? (
+                                <span className="px-2 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
+                                  🏢 Kantor
+                                </span>
+                              ) : k.userId === user?.id ? (
+                                <span className="px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                                  👤 Pribadi
+                                </span>
                               ) : (
-                                <span className="text-[11px] text-muted-foreground italic flex items-center gap-1">
-                                  <Lock size={11} /> Kontak Kantor
+                                <span className="px-2 py-0.2 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
+                                  👤 {k.user?.nama || 'Petugas'}
                                 </span>
                               )}
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                                k.aktif
+                                  ? 'bg-green-500/15 text-green-700 dark:text-green-300'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {k.aktif ? 'Aktif' : 'Non-aktif'}
+                              </span>
                             </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1">
+                          {canEdit ? (
+                            <>
+                              <button
+                                onClick={() => openEditKontak(k)}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                                title="Edit Kontak"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteKontak(k)}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                title="Hapus Kontak"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic flex items-center gap-1 bg-secondary/60 px-2 py-1 rounded-lg">
+                              <Lock size={10} /> Kantor
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Contact details */}
+                      <div className="grid grid-cols-1 gap-1.5 text-xs pt-2 border-t border-border/60">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">WhatsApp:</span>
+                          <a
+                            href={waLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-primary font-semibold hover:underline flex items-center gap-1"
+                          >
+                            <Phone size={12} />
+                            <span>{k.nomorWa}</span>
+                          </a>
+                        </div>
+                        {(k.jabatan || k.instansi) && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Jabatan / Instansi:</span>
+                            <span className="text-foreground font-medium text-right">
+                              {[k.jabatan, k.instansi].filter(Boolean).join(' - ') || '-'}
+                            </span>
+                          </div>
+                        )}
+                        {k.catatan && (
+                          <div className="flex items-start justify-between gap-2 text-muted-foreground">
+                            <span className="shrink-0">Catatan:</span>
+                            <span className="italic text-right text-[11px]">{k.catatan}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop Table View (Screen >= md) */}
+              <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-secondary/60 text-muted-foreground font-semibold border-b border-border text-[11px] uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Nama Penerima</th>
+                        <th className="px-4 py-3">Nomor WhatsApp</th>
+                        <th className="px-4 py-3">Jabatan & Instansi</th>
+                        <th className="px-4 py-3">Catatan</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {kontakList.map((k) => {
+                        const canEdit = isAdmin || k.userId === user?.id
+                        return (
+                          <tr key={k.id} className="hover:bg-secondary/30 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-foreground">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                                  {k.nama.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>{k.nama}</span>
+                                    {k.isGlobal ? (
+                                      <span className="px-2 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
+                                        🏢 Kantor
+                                      </span>
+                                    ) : k.userId === user?.id ? (
+                                      <span className="px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                                        👤 Pribadi
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.2 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
+                                        👤 {k.user?.nama || 'Petugas'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-muted-foreground">
+                              <div className="flex items-center gap-1.5">
+                                <Phone size={12} className="text-primary shrink-0" />
+                                <span>{k.nomorWa}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="text-foreground font-medium">{k.jabatan || '-'}</div>
+                              <div className="text-[11px] text-muted-foreground">{k.instansi || '-'}</div>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
+                              {k.catatan || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                k.aktif
+                                  ? 'bg-green-500/15 text-green-700 dark:text-green-300'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {k.aktif ? 'Aktif' : 'Non-aktif'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {canEdit ? (
+                                  <>
+                                    <button
+                                      onClick={() => openEditKontak(k)}
+                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                                      title="Edit Kontak"
+                                    >
+                                      <Pencil size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDeleteKontak(k)}
+                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                      title="Hapus Kontak"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-[11px] text-muted-foreground italic flex items-center gap-1">
+                                    <Lock size={11} /> Kontak Kantor
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1305,75 +1557,201 @@ export default function KontakWaPage() {
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* MODAL: SCAN QR CODE WHATSAPP                                  */}
+      {/* MODAL: TAUTKAN WHATSAPP (KODE PAIRING ATAU SCAN QR)           */}
       {/* ───────────────────────────────────────────────────────────── */}
       {qrModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
-          <div className="bg-card border border-border rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-5 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl space-y-4 text-center max-h-[95vh] overflow-y-auto">
+            {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="text-left">
-                <h3 className="text-sm font-bold text-foreground">Scan QR WhatsApp</h3>
-                <p className="text-xs text-muted-foreground">{qrModal.device?.nama}</p>
+                <h3 className="text-sm sm:text-base font-bold text-foreground">Tautkan Akun WhatsApp</h3>
+                <p className="text-xs text-muted-foreground truncate max-w-[240px]">
+                  {qrModal.device?.nama || 'WhatsApp'}
+                </p>
               </div>
               <button
                 onClick={handleCloseQrModal}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            {/* QR Code Container */}
-            <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-inner min-h-[250px]">
-              {qrModal.loading ? (
-                <div className="flex flex-col items-center justify-center space-y-2 py-10">
-                  <Loader2 size={32} className="animate-spin text-primary" />
-                  <span className="text-xs font-semibold text-neutral-600">Menghubungkan ke Fonnte...</span>
+            {/* Switcher Mode Tab */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-secondary/80 rounded-xl border border-border">
+              <button
+                type="button"
+                onClick={() => handleSwitchConnectMethod('code')}
+                disabled={qrModal.loading}
+                className={`py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  qrModal.type === 'code'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Hash size={14} className={qrModal.type === 'code' ? 'text-primary' : ''} />
+                <span>Kode Pairing</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold hidden xs:inline">
+                  HP
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSwitchConnectMethod('qr')}
+                disabled={qrModal.loading}
+                className={`py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  qrModal.type === 'qr'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <QrCode size={14} className={qrModal.type === 'qr' ? 'text-primary' : ''} />
+                <span>Scan Barcode QR</span>
+              </button>
+            </div>
+
+            {/* Modal Body: Loading State */}
+            {qrModal.loading ? (
+              <div className="flex flex-col items-center justify-center space-y-3 py-12 bg-secondary/30 rounded-2xl border border-border">
+                <Loader2 size={36} className="animate-spin text-primary" />
+                <div className="text-xs font-semibold text-foreground">
+                  Menghubungi server Fonnte...
                 </div>
-              ) : qrModal.qrUrl ? (
-                <div className="space-y-2">
-                  <img
-                    src={qrModal.qrUrl.startsWith('data:') ? qrModal.qrUrl : `data:image/png;base64,${qrModal.qrUrl}`}
-                    alt="WhatsApp QR Code"
-                    className="w-56 h-56 object-contain rounded-lg mx-auto"
-                  />
-                  <div className="text-[11px] font-semibold text-neutral-500">
-                    Memantau koneksi otomatis... (polling)
+                <p className="text-[11px] text-muted-foreground max-w-xs">
+                  {qrModal.type === 'code' ? 'Meminta kode 8-digit pairing...' : 'Membuat gambar barcode QR...'}
+                </p>
+              </div>
+            ) : qrModal.type === 'code' ? (
+              /* TAB KODE PAIRING */
+              <div className="space-y-3.5">
+                <div className="p-4 sm:p-5 bg-secondary/50 border-2 border-dashed border-primary/40 rounded-2xl flex flex-col items-center justify-center gap-3">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Kode Pairing WhatsApp Anda
+                  </span>
+
+                  {qrModal.code ? (
+                    <div className="flex flex-col items-center gap-2.5 w-full">
+                      <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-widest text-primary bg-card px-4 sm:px-6 py-2.5 rounded-2xl border border-border shadow-xs select-all">
+                        {qrModal.code}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyPairingCode}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-xs ${
+                          qrModal.copied
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                        }`}
+                      >
+                        {qrModal.copied ? (
+                          <>
+                            <Check size={14} />
+                            <span>Tersalin ke Clipboard!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} />
+                            <span>Salin Kode Pairing</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground py-3">
+                      Kode belum tersedia. Klik "Segarkan" di bawah.
+                    </div>
+                  )}
+
+                  {/* Polling Liveness Indicator */}
+                  <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground pt-1">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>Menunggu konfirmasi tautan dari WhatsApp HP Anda...</span>
                   </div>
                 </div>
-              ) : (
-                <div className="py-8 text-neutral-500 text-xs">
-                  Gagal memuat QR Code. Silakan klik tombol Segarkan di bawah.
+
+                {/* Langkah Penggunaan Kode di HP */}
+                <div className="text-left bg-muted/40 p-3.5 rounded-xl border border-border/60 text-xs text-muted-foreground space-y-1.5 leading-relaxed">
+                  <p className="font-bold text-foreground flex items-center gap-1.5">
+                    <Smartphone size={13} className="text-primary" />
+                    <span>Langkah Memasukkan Kode di WhatsApp HP:</span>
+                  </p>
+                  <ol className="list-decimal list-inside pl-1 space-y-1">
+                    <li>Buka aplikasi <strong>WhatsApp</strong> di HP Anda.</li>
+                    <li>Ketuk titik tiga / Pengaturan → <strong>Perangkat Tertaut</strong>.</li>
+                    <li>Ketuk tombol <strong>Tautkan Perangkat</strong>.</li>
+                    <li>Ketuk opsi <strong>"Tautkan dengan nomor telepon saja"</strong> <em>(Link with phone number instead)</em> di paling bawah layar HP.</li>
+                    <li>Masukkan 8 digit kode di atas ke layar WhatsApp Anda.</li>
+                  </ol>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              /* TAB BARCODE QR */
+              <div className="space-y-3.5">
+                <div className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-inner min-h-[240px]">
+                  {qrModal.qrUrl ? (
+                    <div className="space-y-2">
+                      <img
+                        src={qrModal.qrUrl.startsWith('data:') ? qrModal.qrUrl : `data:image/png;base64,${qrModal.qrUrl}`}
+                        alt="WhatsApp QR Code"
+                        className="w-52 h-52 object-contain rounded-lg mx-auto"
+                      />
+                      <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-neutral-600">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span>Memantau scan barcode otomatis...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-neutral-500 text-xs">
+                      Gagal memuat QR Code. Silakan klik tombol Segarkan di bawah.
+                    </div>
+                  )}
+                </div>
 
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p className="font-semibold text-foreground">Langkah Scan di HP:</p>
-              <p>1. Buka WhatsApp di HP Anda</p>
-              <p>2. Pilih menu <strong>Perangkat Tertaut</strong> → <strong>Tautkan Perangkat</strong></p>
-              <p>3. Arahkan kamera HP ke QR Code di atas</p>
-            </div>
+                {/* Langkah Scan QR di HP */}
+                <div className="text-left bg-muted/40 p-3.5 rounded-xl border border-border/60 text-xs text-muted-foreground space-y-1.5 leading-relaxed">
+                  <p className="font-bold text-foreground flex items-center gap-1.5">
+                    <QrCode size={13} className="text-primary" />
+                    <span>Langkah Scan QR di HP:</span>
+                  </p>
+                  <ol className="list-decimal list-inside pl-1 space-y-1">
+                    <li>Buka WhatsApp di HP Anda.</li>
+                    <li>Pilih menu <strong>Perangkat Tertaut</strong> → <strong>Tautkan Perangkat</strong>.</li>
+                    <li>Arahkan kamera HP ke Barcode QR di atas.</li>
+                  </ol>
+                </div>
+              </div>
+            )}
 
-            <div className="flex gap-2">
+            {/* Bottom Actions */}
+            <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => {
                   if (qrModal.isMyDevice || !isAdmin) {
-                    handleConnectMyDeviceQr()
+                    handleConnectMyDevice(inputPhone, qrModal.type)
                   } else {
-                    handleOpenQr(qrModal.device)
+                    handleOpenQr(qrModal.device, qrModal.type)
                   }
                 }}
-                className="flex-1 h-9 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                disabled={qrModal.loading}
+                className="flex-1 h-9.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw size={13} className={qrModal.loading ? 'animate-spin' : ''} />
-                <span>Segarkan QR</span>
+                <span>Segarkan {qrModal.type === 'code' ? 'Kode' : 'QR'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleCloseQrModal}
-                className="flex-1 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-xs cursor-pointer"
+                className="flex-1 h-9.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-xs cursor-pointer"
               >
                 Selesai
               </button>

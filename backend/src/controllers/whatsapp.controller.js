@@ -383,27 +383,41 @@ exports.getDeviceQr = async (req, res) => {
     const device = await prisma.deviceWa.findUnique({ where: { id: parseInt(id) } });
     if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
 
-    // Request QR Code dari Fonnte
+    const connectType = (req.query.type || req.body?.type) === 'code' ? 'code' : 'qr';
+    const cleanPhone = (req.query.whatsapp || req.body?.whatsapp || device.nomorWa || '').replace(/\D/g, '');
+
+    const fonntePayload = { type: connectType };
+    if (connectType === 'code') {
+      if (!cleanPhone) {
+        return res.status(400).json({ error: 'Nomor WhatsApp wajib diisi untuk mendapatkan kode pairing.' });
+      }
+      fonntePayload.whatsapp = cleanPhone;
+    }
+
+    // Request QR Code atau Pairing Code dari Fonnte
     const response = await fetch('https://api.fonnte.com/qr', {
       method: 'POST',
       headers: {
         'Authorization': device.token,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ type: 'qr' })
+      body: JSON.stringify(fonntePayload)
     });
     const result = await response.json();
 
     if (result.status) {
       res.json({
         success: true,
-        url: result.url, // Base64 image string atau image URL
+        type: connectType,
+        url: result.url,
+        code: result.code || result.url,
         deviceId: device.id,
-        nama: device.nama
+        nama: device.nama,
+        nomorWa: device.nomorWa || cleanPhone
       });
     } else {
       res.status(400).json({
-        error: result.reason || 'Gagal menghasilkan QR Code dari Fonnte. Pastikan device belum terhubung atau lakukan reset.',
+        error: result.reason || (connectType === 'code' ? 'Gagal menghasilkan Kode Pairing dari Fonnte.' : 'Gagal menghasilkan QR Code dari Fonnte. Pastikan device belum terhubung.'),
         raw: result
       });
     }
@@ -646,7 +660,7 @@ exports.requestMyDeviceQr = async (req, res) => {
       let targetPhone = formattedPhone;
       if (!targetPhone || targetPhone.length < 9) {
         return res.status(400).json({
-          error: 'Silakan masukkan nomor WhatsApp Anda terlebih dahulu sebelum memindai QR Code.'
+          error: 'Silakan masukkan nomor WhatsApp Anda terlebih dahulu sebelum menghubungkan WhatsApp.'
         });
       }
 
@@ -707,24 +721,33 @@ exports.requestMyDeviceQr = async (req, res) => {
       }
     }
 
-    // Ambil QR Code dari Fonnte menggunakan device.token
+    const connectType = req.body.type === 'code' ? 'code' : 'qr';
+    const cleanPhone = (device.nomorWa || targetPhone || '').replace(/\D/g, '');
+    const fonntePayload = { type: connectType };
+    if (connectType === 'code') {
+      fonntePayload.whatsapp = cleanPhone;
+    }
+
+    // Ambil QR Code atau Pairing Code dari Fonnte menggunakan device.token
     const qrRes = await fetch('https://api.fonnte.com/qr', {
       method: 'POST',
       headers: {
         'Authorization': device.token,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ type: 'qr' })
+      body: JSON.stringify(fonntePayload)
     });
     const qrData = await qrRes.json();
 
     if (qrData.status) {
       return res.json({
         success: true,
+        type: connectType,
         url: qrData.url,
+        code: qrData.code || qrData.url,
         deviceId: device.id,
         nama: device.nama,
-        nomorWa: device.nomorWa
+        nomorWa: device.nomorWa || cleanPhone
       });
     } else {
       // Jika Fonnte menolak karena device sudah connect
@@ -742,7 +765,7 @@ exports.requestMyDeviceQr = async (req, res) => {
       }
 
       return res.status(400).json({
-        error: qrData.reason || 'Gagal menghasilkan QR Code dari Fonnte. Silakan coba lagi beberapa saat.',
+        error: qrData.reason || (connectType === 'code' ? 'Gagal menghasilkan Kode Pairing dari Fonnte. Silakan coba lagi beberapa saat.' : 'Gagal menghasilkan QR Code dari Fonnte. Silakan coba lagi beberapa saat.'),
         raw: qrData
       });
     }

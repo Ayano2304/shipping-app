@@ -498,30 +498,30 @@ export default function PengirimanDetailPage() {
               <button
                 onClick={handleExportPDF}
                 disabled={exportingPdf}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs sm:text-sm font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs sm:text-sm font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
                 title="Unduh Laporan PDF"
               >
-                {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={16} className="text-red-500" />}
+                {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={15} className="text-red-500" />}
                 <span>PDF</span>
               </button>
 
               <button
                 onClick={handleOpenShareModal}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-all shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-all shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
                 title="Bagikan Laporan via WhatsApp Share Link (Tanpa Bot / Bebas Scan QR)"
               >
                 <Share2 size={15} />
-                <span>Share WA (Link)</span>
+                <span>Share WA</span>
               </button>
 
               {['ADMIN', 'PETUGAS', 'SURVEYOR'].includes(user?.role) && (
                 <button
                   onClick={() => setWaModal(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs sm:text-sm font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs sm:text-sm font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
                   title="Kirim Otomatis via Server Bot / Broadcast"
                 >
                   <MessageCircle size={15} className="text-emerald-600 dark:text-emerald-400" />
-                  <span className="hidden sm:inline">Bot WA</span>
+                  <span>Bot WA</span>
                 </button>
               )}
             </>

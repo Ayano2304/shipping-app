@@ -14,6 +14,7 @@ const getHeaderLabel = (pathname) => {
   if (pathname.startsWith('/kapal')) return 'Master Kapal'
   if (pathname.startsWith('/users')) return 'Manajemen User'
   if (pathname.startsWith('/masterdata')) return 'Master Data'
+  if (pathname.startsWith('/kontak-wa')) return 'Buku Kontak & WA'
   if (pathname.startsWith('/settings')) return 'Pengaturan'
   return 'CPO Tanker'
 }
@@ -33,22 +34,24 @@ export default function Header({ onOpenSidebar }) {
   const label = getHeaderLabel(pathname)
 
   return (
-    <header className="h-16 border-b border-border bg-card/75 backdrop-blur flex items-center justify-between px-4 md:px-6 shrink-0 transition-colors z-30">
+    <header className="h-16 border-b border-border bg-card/75 backdrop-blur flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0 transition-colors z-30">
       {/* Left side: Hamburger (mobile only) + Page Title aligned in the exact same flex row */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           type="button"
           onClick={onOpenSidebar}
           aria-label="Buka Menu"
-          className="md:hidden w-9 h-9 bg-card border border-border rounded-lg flex items-center justify-center text-foreground hover:bg-secondary active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
+          className="md:hidden w-8.5 h-8.5 sm:w-9 sm:h-9 bg-card border border-border rounded-lg flex items-center justify-center text-foreground hover:bg-secondary active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
         >
           <Menu size={18} />
         </button>
-        <h1 className="text-sm sm:text-base font-semibold text-foreground leading-none">{label}</h1>
+        <h1 className="text-sm sm:text-base font-semibold text-foreground leading-none truncate max-w-[130px] xs:max-w-[190px] sm:max-w-none">
+          {label}
+        </h1>
       </div>
 
       {/* Right side: Notification + Theme Toggle + Static User Status Pill */}
-      <div className="flex items-center gap-2 sm:gap-2.5">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Notification Bell Dropdown */}
         <NotificationDropdown />
 
@@ -58,16 +61,16 @@ export default function Header({ onOpenSidebar }) {
           onClick={(e) => toggleTheme(e)}
           title={theme === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
           aria-label="Toggle Theme"
-          className="relative w-9 h-9 rounded-xl border border-border bg-card hover:bg-secondary flex items-center justify-center text-foreground transition-all active:scale-90 shadow-xs overflow-hidden group cursor-pointer"
+          className="relative w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl border border-border bg-card hover:bg-secondary flex items-center justify-center text-foreground transition-all active:scale-90 shadow-xs overflow-hidden group cursor-pointer shrink-0"
         >
           <Sun
-            size={17}
+            size={16}
             className={`absolute text-amber-400 transition-all duration-500 transform ${
               theme === 'dark' ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-0 opacity-0'
             }`}
           />
           <Moon
-            size={17}
+            size={16}
             className={`absolute text-indigo-600 transition-all duration-500 transform ${
               theme === 'dark' ? 'rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'
             }`}
@@ -75,10 +78,10 @@ export default function Header({ onOpenSidebar }) {
         </button>
 
         {/* User Identity Pill (Static Active User Display) */}
-        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-border/80 bg-secondary/40 select-none shadow-xs">
+        <div className="flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-border/80 bg-secondary/40 select-none shadow-xs shrink-0">
           {/* Avatar with green online dot */}
-          <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-background border border-border/80 text-foreground shrink-0 shadow-inner">
-            <User size={15} className="text-foreground/80" />
+          <div className="relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-background border border-border/80 text-foreground shrink-0 shadow-inner">
+            <User size={14} className="text-foreground/80" />
             {/* Online Green Dot */}
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-card shadow-xs animate-pulse" />
           </div>
