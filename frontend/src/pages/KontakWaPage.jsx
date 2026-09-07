@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
-import { Navigate } from 'react-router-dom'
 import {
   getKontakWa, createKontakWa, updateKontakWa, deleteKontakWa,
   getDevicesWA, addDeviceWAAuto, addDeviceWAManual, getDeviceWAQr,
   checkDeviceWAStatus, disconnectDeviceWA, setDefaultDeviceWA, deleteDeviceWA, testDeviceWA,
+  getMyDeviceWA, requestMyDeviceWAQr, checkMyDeviceWAStatus, disconnectMyDeviceWA, testMyDeviceWA,
   getWATemplates, createWATemplate, updateWATemplate, deleteWATemplate,
   getUsers
 } from '../lib/api'
@@ -13,34 +13,33 @@ import {
   Contact, Plus, Search, Pencil, Trash2, Loader2, Phone,
   Building2, Briefcase, MessageSquare, CheckCircle2, XCircle,
   X, AlertTriangle, QrCode, RefreshCw, Send, Smartphone, Star,
-  UserCheck, Shield, Bookmark, Sparkles, Copy, Check
+  UserCheck, Shield, Bookmark, Sparkles, Copy, Check, Lock
 } from 'lucide-react'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 
 export default function KontakWaPage() {
   const { user } = useAuthStore()
+  const isAdmin = user?.role === 'ADMIN'
 
-  // Guard ADMIN only
-  if (user?.role !== 'ADMIN') {
-    return <Navigate to="/dashboard" replace />
-  }
-
-  // Active Tab: 'penerima' | 'pengirim' | 'template'
-  const [activeTab, setActiveTab] = useState('pengirim')
+  // Active Tab:
+  // Admin: 'pengirim' | 'penerima' | 'template'
+  // Non-Admin: 'penerima' | 'my-device' | 'template'
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'pengirim' : 'penerima')
 
   // ─── TAB 1: KONTAK PENERIMA STATE ───
   const [kontakList, setKontakList] = useState([])
   const [loadingKontak, setLoadingKontak] = useState(true)
   const [searchKontak, setSearchKontak] = useState('')
+  const [kontakFilter, setKontakFilter] = useState('all') // 'all' | 'mine' | 'global'
   const [modalKontakOpen, setModalKontakOpen] = useState(false)
   const [editKontakId, setEditKontakId] = useState(null)
   const [confirmDeleteKontak, setConfirmDeleteKontak] = useState(null)
   const [submittingKontak, setSubmittingKontak] = useState(false)
   const [formKontak, setFormKontak] = useState({
-    nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true
+    nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true, isGlobal: false
   })
 
-  // ─── TAB 2: AKUN PENGIRIM (DEVICES) STATE ───
+  // ─── TAB 2A: AKUN PENGIRIM (DEVICES - ADMIN VIEW) STATE ───
   const [devicesList, setDevicesList] = useState([])
   const [usersList, setUsersList] = useState([])
   const [loadingDevices, setLoadingDevices] = useState(true)
@@ -50,6 +49,11 @@ export default function KontakWaPage() {
   const [formDevice, setFormDevice] = useState({
     nama: '', device: '', token: '', userId: '', isDefault: false, accountToken: ''
   })
+
+  // ─── TAB 2B: WHATSAPP SAYA (NON-ADMIN / SURVEYOR VIEW) STATE ───
+  const [myDevice, setMyDevice] = useState(null)
+  const [loadingMyDevice, setLoadingMyDevice] = useState(true)
+  const [connectingMyDevice, setConnectingMyDevice] = useState(false)
   
   // QR Modal State
   const [qrModal, setQrModal] = useState({ open: false, device: null, qrUrl: null, loading: false })
@@ -98,6 +102,18 @@ export default function KontakWaPage() {
     }
   }
 
+  const loadMyDevice = async () => {
+    try {
+      setLoadingMyDevice(true)
+      const res = await getMyDeviceWA()
+      setMyDevice(res.data?.device || null)
+    } catch {
+      console.warn('Gagal memuat perangkat WhatsApp saya.')
+    } finally {
+      setLoadingMyDevice(false)
+    }
+  }
+
   const loadTemplates = async () => {
     try {
       setLoadingTemplates(true)
@@ -111,10 +127,14 @@ export default function KontakWaPage() {
   }
 
   useEffect(() => {
-    loadDevices()
+    if (isAdmin) {
+      loadDevices()
+    } else {
+      loadMyDevice()
+    }
     loadKontak()
     loadTemplates()
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => {
     loadKontak()
@@ -131,7 +151,7 @@ export default function KontakWaPage() {
 
   const openAddKontak = () => {
     setEditKontakId(null)
-    setFormKontak({ nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true })
+    setFormKontak({ nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true, isGlobal: false })
     setModalKontakOpen(true)
   }
 
@@ -139,9 +159,53 @@ export default function KontakWaPage() {
     setEditKontakId(k.id)
     setFormKontak({
       nama: k.nama, nomorWa: k.nomorWa, jabatan: k.jabatan || '',
-      instansi: k.instansi || '', catatan: k.catatan || '', aktif: k.aktif
+      instansi: k.instansi || '', catatan: k.catatan || '', aktif: k.aktif,
+      isGlobal: Boolean(k.isGlobal)
     })
     setModalKontakOpen(true)
+  }
+
+  // ─── TAB 2B HANDLERS (WHATSAPP SAYA - NON-ADMIN) ───
+
+  const handleConnectMyDeviceQr = async () => {
+    setConnectingMyDevice(true)
+    setQrModal({ open: true, device: { nama: `WA - ${user?.nama || 'Saya'}` }, qrUrl: null, loading: true })
+    if (qrPollRef.current) clearInterval(qrPollRef.current)
+
+    try {
+      const res = await requestMyDeviceWAQr()
+      setQrModal(prev => ({ ...prev, qrUrl: res.data.url, loading: false }))
+
+      // Polling cek status tiap 3 detik
+      qrPollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await checkMyDeviceWAStatus()
+          if (statusRes.data?.connected) {
+            clearInterval(qrPollRef.current)
+            toast.success('WhatsApp Anda Berhasil Terhubung! 🎉')
+            setQrModal({ open: false, device: null, qrUrl: null, loading: false })
+            loadMyDevice()
+          }
+        } catch {
+          // Silent polling
+        }
+      }, 3000)
+    } catch (err) {
+      setQrModal(prev => ({ ...prev, loading: false }))
+      toast.error(err.response?.data?.error || 'Gagal mengambil QR Code dari Fonnte.')
+    } finally {
+      setConnectingMyDevice(false)
+    }
+  }
+
+  const handleDisconnectMyDevice = async () => {
+    try {
+      await disconnectMyDeviceWA()
+      toast.success('WhatsApp berhasil diputuskan.')
+      loadMyDevice()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal memutuskan WhatsApp.')
+    }
   }
 
   const handleSubmitKontak = async (e) => {
@@ -399,9 +463,13 @@ export default function KontakWaPage() {
               <MessageSquare size={20} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Pusat WhatsApp</h1>
+              <h1 className="text-xl font-bold text-foreground">
+                {isAdmin ? 'Pusat WhatsApp (Admin)' : 'Buku Kontak & WhatsApp Saya'}
+              </h1>
               <p className="text-xs text-muted-foreground">
-                Integrasi Gateway Fonnte: Multi-Perangkat Pengirim, Broadcast Kontak Penerima, & Template Laporan
+                {isAdmin 
+                  ? 'Manajemen Multi-Device Fonnte, Kontak Penerima & Template Laporan'
+                  : 'Kelola kontak pribadi relasi Anda & tautkan WhatsApp mandiri'}
               </p>
             </div>
           </div>
@@ -409,24 +477,45 @@ export default function KontakWaPage() {
 
         {/* Tab Controls */}
         <div className="flex items-center p-1 bg-secondary/80 border border-border rounded-2xl shrink-0 self-start sm:self-auto shadow-xs">
-          <button
-            onClick={() => setActiveTab('pengirim')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeTab === 'pengirim'
-                ? 'bg-card text-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Smartphone size={14} className={activeTab === 'pengirim' ? 'text-primary' : ''} />
-            <span>Akun Pengirim</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-              devicesList.some(d => d.status === 'connected')
-                ? 'bg-green-500/20 text-green-700 dark:text-green-300'
-                : 'bg-muted text-muted-foreground'
-            }`}>
-              {devicesList.length}
-            </span>
-          </button>
+          {isAdmin ? (
+            <button
+              onClick={() => setActiveTab('pengirim')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'pengirim'
+                  ? 'bg-card text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Smartphone size={14} className={activeTab === 'pengirim' ? 'text-primary' : ''} />
+              <span>Akun Pengirim</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                devicesList.some(d => d.status === 'connected')
+                  ? 'bg-green-500/20 text-green-700 dark:text-green-300'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {devicesList.length}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab('my-device')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'my-device'
+                  ? 'bg-card text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Smartphone size={14} className={activeTab === 'my-device' ? 'text-primary' : ''} />
+              <span>WhatsApp Saya</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                myDevice?.status === 'connected'
+                  ? 'bg-green-500/20 text-green-700 dark:text-green-300'
+                  : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+              }`}>
+                {myDevice?.status === 'connected' ? 'Aktif' : 'Offline'}
+              </span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('penerima')}
@@ -437,7 +526,7 @@ export default function KontakWaPage() {
             }`}
           >
             <Contact size={14} className={activeTab === 'penerima' ? 'text-primary' : ''} />
-            <span>Kontak Penerima</span>
+            <span>{isAdmin ? 'Kontak Penerima' : 'Buku Kontak Saya'}</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-muted text-muted-foreground">
               {kontakList.length}
             </span>
@@ -656,6 +745,134 @@ export default function KontakWaPage() {
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
+      {/* TAB 2B: WHATSAPP SAYA (SELF-SERVICE QR KHUSUS NON-ADMIN)       */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'my-device' && (
+        <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
+                  <Smartphone size={22} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-foreground">Koneksi WhatsApp Saya</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Tautkan akun WhatsApp HP Anda untuk mengirim laporan perhitungan CPO secara otomatis
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={loadMyDevice}
+                disabled={loadingMyDevice}
+                className="p-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
+                title="Refresh Status"
+              >
+                <RefreshCw size={14} className={loadingMyDevice ? 'animate-spin' : ''} />
+              </button>
+            </div>
+
+            {loadingMyDevice ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 size={28} className="animate-spin text-primary mb-2" />
+                <div className="text-xs text-muted-foreground">Memeriksa status WhatsApp Anda...</div>
+              </div>
+            ) : myDevice?.status === 'connected' ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/25 flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
+                      <CheckCircle2 size={20} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <span>WhatsApp Terhubung</span>
+                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-700 dark:text-green-300 font-bold text-[10px]">
+                          🟢 ONLINE
+                        </span>
+                      </div>
+                      <div className="text-xs font-mono text-muted-foreground mt-0.5">
+                        Nomor: +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'} ({myDevice.nama})
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDisconnectMyDevice()}
+                    className="px-3.5 py-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Putuskan Koneksi
+                  </button>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs text-muted-foreground space-y-1">
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-amber-500" /> Siap Mengirim Laporan:
+                  </div>
+                  <p>
+                    Setiap kali Anda menekan tombol <strong>Kirim via Bot Server</strong> di halaman pengiriman, laporan & PDF akan terkirim langsung dari nomor WhatsApp Anda.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setTestModal({ open: true, device: myDevice, target: user?.kontakWa || myDevice.nomorWa || '', loading: false })}
+                    className="px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-xs font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                  >
+                    <Send size={13} />
+                    <span>Tes Kirim Pesan Uji Coba</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-secondary/60 border border-border flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                    <Smartphone size={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <span>WhatsApp Belum Terhubung</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold text-[10px]">
+                        🔴 OFFLINE
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Tautkan akun WhatsApp Anda sekarang agar laporan muatan CPO terkirim dari nomor WhatsApp Anda sendiri ke pihak kapal, agen, dan buyer.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-dashed border-border bg-card space-y-3">
+                  <div className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                    <QrCode size={15} className="text-primary" />
+                    <span>Langkah Menghubungkan WhatsApp:</span>
+                  </div>
+                  <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1">
+                    <li>Klik tombol hijau <strong>"Scan Barcode QR Sekarang"</strong> di bawah.</li>
+                    <li>Buka aplikasi WhatsApp di HP Anda.</li>
+                    <li>Buka menu <strong>Perangkat Tertaut (Linked Devices)</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
+                    <li>Arahkan kamera HP Anda ke Barcode QR yang muncul di layar ini.</li>
+                  </ol>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleConnectMyDeviceQr}
+                      disabled={connectingMyDevice}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                    >
+                      {connectingMyDevice ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={15} />}
+                      <span>Scan Barcode QR Sekarang</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
       {/* TAB 1: KONTAK PENERIMA LAPORAN (TARGET BROADCAST)             */}
       {/* ───────────────────────────────────────────────────────────── */}
       {activeTab === 'penerima' && (
@@ -665,10 +882,12 @@ export default function KontakWaPage() {
             <div>
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Contact size={16} className="text-primary" />
-                <span>Buku Kontak Penerima Laporan Sounding</span>
+                <span>{isAdmin ? 'Buku Kontak Penerima Laporan' : 'Buku Kontak Relasi Saya'}</span>
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Daftar pihak stakeholder/buyer yang akan menerima broadcast laporan sounding CPO resmi secara berkala.
+                {isAdmin 
+                  ? 'Daftar stakeholder/buyer yang akan menerima broadcast laporan sounding resmi.'
+                  : 'Kontak pribadi relasi bisnis Anda yang tersimpan aman untuk pengiriman laporan.'}
               </p>
             </div>
             <button
@@ -676,7 +895,7 @@ export default function KontakWaPage() {
               className="w-full sm:w-auto px-4 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
             >
               <Plus size={15} />
-              <span>Tambah Kontak Penerima</span>
+              <span>{isAdmin ? 'Tambah Kontak' : 'Tambah Kontak Saya'}</span>
             </button>
           </div>
 
@@ -703,9 +922,9 @@ export default function KontakWaPage() {
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-3">
                 <Contact size={24} />
               </div>
-              <h3 className="text-sm font-bold text-foreground">Tidak Ada Kontak Penerima Ditemukan</h3>
+              <h3 className="text-sm font-bold text-foreground">Tidak Ada Kontak Ditemukan</h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
-                {searchKontak ? 'Tidak ada kontak yang cocok dengan kata kunci pencarian.' : 'Tambahkan nomor WhatsApp stakeholder, owner kapal, atau direksi untuk menerima broadcast laporan.'}
+                {searchKontak ? 'Tidak ada kontak yang cocok dengan kata kunci pencarian.' : 'Tambahkan nomor WhatsApp stakeholder atau relasi bisnis Anda untuk memudahkan kirim laporan.'}
               </p>
               {!searchKontak && (
                 <button
@@ -731,58 +950,86 @@ export default function KontakWaPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {kontakList.map((k) => (
-                      <tr key={k.id} className="hover:bg-secondary/30 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-foreground">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                              {k.nama.charAt(0).toUpperCase()}
+                    {kontakList.map((k) => {
+                      const canEdit = isAdmin || k.userId === user?.id
+                      return (
+                        <tr key={k.id} className="hover:bg-secondary/30 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-foreground">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                                {k.nama.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span>{k.nama}</span>
+                                  {k.isGlobal ? (
+                                    <span className="px-2 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
+                                      🏢 Kantor
+                                    </span>
+                                  ) : k.userId === user?.id ? (
+                                    <span className="px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                                      👤 Pribadi
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.2 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
+                                      👤 {k.user?.nama || 'Petugas'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <span>{k.nama}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-muted-foreground">
-                          <div className="flex items-center gap-1.5">
-                            <Phone size={12} className="text-primary shrink-0" />
-                            <span>{k.nomorWa}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-foreground font-medium">{k.jabatan || '-'}</div>
-                          <div className="text-[11px] text-muted-foreground">{k.instansi || '-'}</div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
-                          {k.catatan || '-'}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            k.aktif
-                              ? 'bg-green-500/15 text-green-700 dark:text-green-300'
-                              : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {k.aktif ? 'Aktif' : 'Non-aktif'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => openEditKontak(k)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-                              title="Edit Kontak"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteKontak(k)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                              title="Hapus Kontak"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-muted-foreground">
+                            <div className="flex items-center gap-1.5">
+                              <Phone size={12} className="text-primary shrink-0" />
+                              <span>{k.nomorWa}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-foreground font-medium">{k.jabatan || '-'}</div>
+                            <div className="text-[11px] text-muted-foreground">{k.instansi || '-'}</div>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
+                            {k.catatan || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              k.aktif
+                                ? 'bg-green-500/15 text-green-700 dark:text-green-300'
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {k.aktif ? 'Aktif' : 'Non-aktif'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {canEdit ? (
+                                <>
+                                  <button
+                                    onClick={() => openEditKontak(k)}
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                                    title="Edit Kontak"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteKontak(k)}
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                    title="Hapus Kontak"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground italic flex items-center gap-1">
+                                  <Lock size={11} /> Kontak Kantor
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1238,9 +1485,24 @@ export default function KontakWaPage() {
                   className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
                 />
                 <label htmlFor="aktifKontak" className="text-xs font-semibold text-foreground cursor-pointer">
-                  Kontak Aktif (Otomatis masuk dalam daftar broadcast)
+                  Kontak Aktif (Dapat dipilih untuk pengiriman laporan)
                 </label>
               </div>
+
+              {isAdmin && (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10">
+                  <input
+                    type="checkbox"
+                    id="isGlobalKontak"
+                    checked={formKontak.isGlobal}
+                    onChange={e => setFormKontak(f => ({ ...f, isGlobal: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 rounded border-border"
+                  />
+                  <label htmlFor="isGlobalKontak" className="text-xs font-semibold text-foreground cursor-pointer">
+                    🏢 Jadikan Kontak Umum Kantor (Tampil untuk semua surveyor)
+                  </label>
+                </div>
+              )}
 
               <div className="pt-3 flex gap-2">
                 <button

@@ -42,6 +42,7 @@ app.use('/api/kontak-wa', require('./routes/kontak.routes'));
 app.use('/api/lookup', require('./routes/lookup.routes'));
 app.use('/api/masterdata', require('./routes/masterdata.routes'));
 app.use('/api/notifikasi', require('./routes/notifikasi.routes'));
+app.use('/api/settings', require('./routes/settings.routes'));
 
 // Clean Public Document Route: /report/HK-III-20-a8f93e7c1b
 app.get('/report/:slug', require('./controllers/export.controller').exportPublicReportBySlug);

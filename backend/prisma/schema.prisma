@@ -31,6 +31,7 @@ model User {
   pengirimanDischarged Pengiriman[] @relation("DischargedBy")
   notifikasi           Notifikasi[]
   deviceWa             DeviceWa[]
+  bukuKontak           KontakWa[]
 
   @@map("users")
 }
@@ -110,10 +111,25 @@ model KontakWa {
   instansi  String?  @db.VarChar(100)
   catatan   String?  @db.VarChar(255)
   aktif     Boolean  @default(true)
+  isGlobal  Boolean  @default(false) @map("is_global")
+  userId    Int?     @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("kontak_wa")
+}
+
+// Tabel Pengaturan Sistem Global
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(100)
+  value     String?  @db.Text
+  deskripsi String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }
 
 // Tabel Notifikasi Sistem

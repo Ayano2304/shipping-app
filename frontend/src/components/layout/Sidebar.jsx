@@ -16,7 +16,10 @@ const getNavItems = (role) => {
       { to: '/kontak-wa', label: 'Pusat WhatsApp', icon: MessageSquare },
       { to: '/users', label: 'Manajemen User', icon: Users },
       { to: '/settings', label: 'Pengaturan', icon: Settings },
-    ] : []),
+    ] : [
+      { to: '/kontak-wa', label: 'Buku Kontak & WA', icon: MessageSquare },
+      { to: '/settings', label: 'Pengaturan', icon: Settings },
+    ]),
   ]
 }
 

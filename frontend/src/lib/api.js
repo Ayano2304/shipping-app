@@ -80,6 +80,20 @@ export const disconnectDeviceWA = (id) => api.post(`/whatsapp/devices/${id}/disc
 export const setDefaultDeviceWA = (id) => api.put(`/whatsapp/devices/${id}/default`)
 export const deleteDeviceWA = (id) => api.delete(`/whatsapp/devices/${id}`)
 export const testDeviceWA = (id, data) => api.post(`/whatsapp/devices/${id}/test`, data)
+
+// User Self-Service Device WhatsApp
+export const getMyDeviceWA = () => api.get('/whatsapp/my-device')
+export const requestMyDeviceWAQr = () => api.post('/whatsapp/my-device/qr')
+export const checkMyDeviceWAStatus = () => api.post('/whatsapp/my-device/status')
+export const disconnectMyDeviceWA = () => api.post('/whatsapp/my-device/disconnect')
+export const saveMyDeviceWAToken = (data) => api.post('/whatsapp/my-device/token', data)
+export const testMyDeviceWA = (data) => api.post('/whatsapp/my-device/test', data)
+
+// Fonnte System Settings (Admin)
+export const getFonnteSetting = () => api.get('/settings/fonnte')
+export const updateFonnteSetting = (data) => api.post('/settings/fonnte', data)
+export const checkFonnteAccount = () => api.post('/settings/fonnte/check')
+
 export const getKontakWa = (params) => api.get('/kontak-wa', { params })
 export const getKontakWaById = (id) => api.get(`/kontak-wa/${id}`)
 export const createKontakWa = (data) => api.post('/kontak-wa', data)

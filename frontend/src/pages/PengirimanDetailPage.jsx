@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getPengirimanById, exportPDF, kirimWA,
-  getKontakWa, getWATemplates, createWATemplate, deleteWATemplate, getDevicesWA
+  getKontakWa, createKontakWa, getWATemplates, createWATemplate, deleteWATemplate, getDevicesWA
 } from '../lib/api'
 import { formatAngka, formatTanggal, toKg, hitungR1, hitungR2, hitungR3 } from '../lib/calc'
 import { downloadBlob } from '../lib/utils'
@@ -1098,6 +1098,27 @@ export default function PengirimanDetailPage() {
                           : 'bg-card border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
                       }`}
                     />
+                    {!selectedContactId && waTarget && waTarget.trim().length >= 8 && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const nama = window.prompt('Masukkan nama pemilik nomor ini untuk disimpan ke Buku Kontak Anda:', '')
+                          if (nama && nama.trim()) {
+                            try {
+                              const res = await createKontakWa({ nama: nama.trim(), nomorWa: waTarget.trim() })
+                              toast.success(`Kontak "${nama}" berhasil disimpan ke Buku Kontak Anda!`)
+                              setSavedContacts(prev => [res.data, ...prev])
+                              setSelectedContactId(res.data.id.toString())
+                            } catch {
+                              toast.error('Gagal menyimpan kontak baru.')
+                            }
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer pt-0.5"
+                      >
+                        <Plus size={12} /> Simpan nomor ini ke Buku Kontak Saya
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
