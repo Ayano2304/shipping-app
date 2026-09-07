@@ -37,9 +37,9 @@ router.post('/test', auth, roleGuard('ADMIN', 'PETUGAS'), waLimiter, whatsappCon
 
 // Templates Pesan WA
 router.get('/templates', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.getTemplates);
-router.post('/templates', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.createTemplate);
-router.put('/templates/:id', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.updateTemplate);
-router.delete('/templates/:id', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.deleteTemplate);
+router.post('/templates', auth, roleGuard('ADMIN'), whatsappController.createTemplate);
+router.put('/templates/:id', auth, roleGuard('ADMIN'), whatsappController.updateTemplate);
+router.delete('/templates/:id', auth, roleGuard('ADMIN'), whatsappController.deleteTemplate);
 
 // Kirim Laporan (Single / Broadcast)
 router.post('/kirim/:pengirimanId', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), waLimiter, whatsappController.kirimLaporan);

@@ -113,7 +113,7 @@ export default function PengirimanListPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border/80 p-5 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-            Riwayat Pengiriman & Logistik
+            Riwayat Pengiriman
           </h2>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             {total} data pengiriman kapal ditemukan dalam sistem.
@@ -137,7 +137,7 @@ export default function PengirimanListPage() {
         {[
           { key: 'ALL', label: 'Semua Pengiriman' },
           { key: 'DALAM_PERJALANAN', label: 'Sedang Berlayar', count: berlayarCount, highlight: true },
-          { key: 'SELESAI', label: 'Selesai (Discharged)' },
+          { key: 'SELESAI', label: 'Selesai' },
           { key: 'DRAFT', label: 'Draft' },
         ].map(tab => (
           <button

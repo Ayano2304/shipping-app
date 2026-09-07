@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getPengirimanById, exportPDF, kirimWA,
-  getKontakWa, createKontakWa, getWATemplates, createWATemplate, deleteWATemplate, getDevicesWA
+  getKontakWa, createKontakWa, getWATemplates, getDevicesWA
 } from '../lib/api'
 import { formatAngka, formatTanggal, toKg, hitungR1, hitungR2, hitungR3 } from '../lib/calc'
 import { downloadBlob } from '../lib/utils'
@@ -154,9 +154,6 @@ export default function PengirimanDetailPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [pesanTeks, setPesanTeks] = useState('')
   const [loadingTemplates, setLoadingTemplates] = useState(false)
-  const [showSaveTemplateInput, setShowSaveTemplateInput] = useState(false)
-  const [newTemplateTitle, setNewTemplateTitle] = useState('')
-  const [savingTemplate, setSavingTemplate] = useState(false)
 
   // WhatsApp Direct Share Link State
   const [shareModal, setShareModal] = useState(false)
@@ -260,7 +257,7 @@ export default function PengirimanDetailPage() {
         .then(res => {
           const list = res.data || []
           setSavedContacts(list)
-          setSelectedRecipientIds(list.map(c => c.id))
+          setSelectedRecipientIds([])
           if (list.length > 0 && !waTarget) {
             setSelectedContactId(list[0].id.toString())
             setWaTarget(list[0].nomorWa)
@@ -301,55 +298,7 @@ export default function PengirimanDetailPage() {
     setPesanTeks(prev => `${prev ? `${prev} ` : ''}${val}`)
   }
 
-  const handleSaveAsNewTemplate = async () => {
-    if (!newTemplateTitle.trim()) {
-      toast.error('Nama template wajib diisi.')
-      return
-    }
-    if (!pesanTeks.trim()) {
-      toast.error('Isi pesan tidak boleh kosong.')
-      return
-    }
 
-    setSavingTemplate(true)
-    try {
-      const res = await createWATemplate({
-        nama: newTemplateTitle.trim(),
-        isi: pesanTeks.trim()
-      })
-      toast.success('Template baru berhasil disimpan!')
-      const created = res.data.data
-      setWaTemplates(prev => [created, ...prev])
-      setSelectedTemplateId(created.id.toString())
-      setShowSaveTemplateInput(false)
-      setNewTemplateTitle('')
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Gagal menyimpan template baru.')
-    } finally {
-      setSavingTemplate(false)
-    }
-  }
-
-  const handleDeleteTemplate = async (templateId, templateName, e) => {
-    e.stopPropagation()
-    if (!window.confirm(`Hapus template "${templateName}"?`)) return
-    try {
-      await deleteWATemplate(templateId)
-      toast.success('Template berhasil dihapus.')
-      const nextList = waTemplates.filter(t => t.id !== templateId)
-      setWaTemplates(nextList)
-      if (selectedTemplateId === templateId.toString()) {
-        if (nextList.length > 0) {
-          setSelectedTemplateId(nextList[0].id.toString())
-          setPesanTeks(interpolateTemplate(nextList[0].isi))
-        } else {
-          setSelectedTemplateId('')
-        }
-      }
-    } catch (err) {
-      toast.error('Gagal menghapus template.')
-    }
-  }
 
   const handleExportPDF = async () => {
     setExportingPdf(true)
@@ -884,40 +833,6 @@ export default function PengirimanDetailPage() {
               </button>
             </div>
 
-            {/* Section 0: Pilihan Akun WhatsApp Pengirim (Multi-Device) */}
-            <div className="space-y-1.5 p-3 rounded-xl bg-secondary/50 border border-border/80">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
-                  <Smartphone size={13} className="text-primary" /> Kirim Menggunakan Akun WhatsApp:
-                </label>
-                <Link to="/kontak-wa" target="_blank" className="text-[11px] text-primary hover:underline font-semibold">
-                  Kelola Akun
-                </Link>
-              </div>
-              {loadingDevices ? (
-                <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
-                  <Loader2 size={12} className="animate-spin text-primary" /> Memuat akun pengirim...
-                </div>
-              ) : senderDevices.length === 0 ? (
-                <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20 flex items-center justify-between">
-                  <span>Belum ada akun WhatsApp terdaftar di sistem.</span>
-                  <Link to="/kontak-wa" target="_blank" className="font-bold underline ml-2">Tambah Akun</Link>
-                </div>
-              ) : (
-                <CustomSelect
-                  value={selectedDeviceId}
-                  onChange={setSelectedDeviceId}
-                  options={senderDevices.map(d => ({
-                    value: d.id.toString(),
-                    label: `${d.nama} (${d.nomorWa ? `+${d.nomorWa.replace(/\D/g, '')}` : 'Belum scan'})${d.isDefault ? ' ⭐ Default' : ''}`,
-                    icon: Smartphone
-                  }))}
-                  placeholder="-- Pilih Akun Pengirim --"
-                  icon={Smartphone}
-                />
-              )}
-            </div>
-
             {/* Section 1: Pilihan Penerima Laporan (Tunggal vs Broadcast) */}
             <div className="space-y-2 bg-secondary/30 p-3.5 rounded-xl border border-border/80">
               <div className="flex items-center justify-between pb-1 border-b border-border/60">
@@ -941,7 +856,7 @@ export default function PengirimanDetailPage() {
                       broadcastMode ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    📢 Broadcast ({savedContacts.length})
+                    👥 Broadcast ({savedContacts.length})
                   </button>
                 </div>
               </div>
@@ -1130,13 +1045,6 @@ export default function PengirimanDetailPage() {
                 <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
                   <Bookmark size={13} className="text-primary" /> Pilih Template Teks Pesan:
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowSaveTemplateInput(prev => !prev)}
-                  className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-semibold"
-                >
-                  <Plus size={12} /> {showSaveTemplateInput ? 'Batal Simpan' : 'Simpan Teks Sebagai Template Baru'}
-                </button>
               </div>
 
               {/* Dropdown Template */}
@@ -1169,31 +1077,6 @@ export default function PengirimanDetailPage() {
                   </button>
                 )}
               </div>
-
-              {/* Inline Form: Simpan Teks sebagai Template Baru */}
-              {showSaveTemplateInput && (
-                <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-2 animate-fade-in">
-                  <div className="text-xs font-semibold text-foreground">Beri Nama Template Baru:</div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newTemplateTitle}
-                      onChange={e => setNewTemplateTitle(e.target.value)}
-                      placeholder="Contoh: Format Singkat ke Manager, Laporan Khusus..."
-                      className="flex-1 h-9 px-3 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveAsNewTemplate}
-                      disabled={savingTemplate || !newTemplateTitle.trim()}
-                      className="px-3.5 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold disabled:opacity-50 transition-all flex items-center gap-1"
-                    >
-                      {savingTemplate ? <Loader2 size={13} className="animate-spin" /> : <Bookmark size={13} />}
-                      <span>Simpan</span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Section 3: Smart Placeholder / Variabel Dinamis Cepat */}
@@ -1249,23 +1132,6 @@ export default function PengirimanDetailPage() {
               </p>
             </div>
 
-            {/* Attach PDF Toggle Option */}
-            <div className="p-3 bg-blue-500/10 border border-blue-500/25 rounded-xl flex items-start gap-2.5">
-              <input
-                type="checkbox"
-                id="attach-pdf-checkbox"
-                checked={attachPdf}
-                onChange={(e) => setAttachPdf(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer"
-              />
-              <label htmlFor="attach-pdf-checkbox" className="text-xs text-foreground cursor-pointer select-none">
-                <span className="font-semibold block">Sertakan Lampiran File Dokumen PDF Resmi</span>
-                <span className="text-muted-foreground text-[11px] block mt-0.5">
-                  Lampirkan dokumen PDF resmi yang otomatis terkirim bersamaan dengan pesan di atas.
-                </span>
-              </label>
-            </div>
-
             {/* Actions */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2.5 border-t border-border">
               <button
@@ -1303,7 +1169,7 @@ export default function PengirimanDetailPage() {
                   ) : (
                     <>
                       <Send size={14} />
-                      <span>{broadcastMode ? `🚀 Kirim Broadcast ke ${selectedRecipientIds.length} Penerima` : '🚀 Kirim via Bot Server'}</span>
+                      <span>{broadcastMode ? `Kirim Broadcast ke ${selectedRecipientIds.length} Penerima` : 'Kirim via Bot Server'}</span>
                     </>
                   )}
                 </button>

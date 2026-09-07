@@ -8,10 +8,9 @@ import {
 import toast from 'react-hot-toast'
 import {
   KeyRound, MessageCircle, Loader2, Check, AlertCircle,
-  CheckCircle2, RefreshCw, Smartphone, ArrowRight, Shield,
+  CheckCircle2, RefreshCw, Shield,
   Database, UserCheck, Info
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 export default function SettingsPage() {
@@ -123,12 +122,12 @@ export default function SettingsPage() {
       <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
-              {user?.nama?.charAt(0).toUpperCase()}
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0 uppercase">
+              {(user?.nama || user?.username || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="font-bold text-base text-foreground flex items-center gap-2">
-                <span>{user?.nama}</span>
+                <span className="uppercase">{(user?.nama || user?.username || '').toUpperCase()}</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
                   user?.role === 'ADMIN'
                     ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
@@ -144,15 +143,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-
-          <Link
-            to="/kontak-wa"
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
-          >
-            <Smartphone size={14} />
-            <span>Koneksi WhatsApp Saya</span>
-            <ArrowRight size={13} />
-          </Link>
         </div>
       </div>
 

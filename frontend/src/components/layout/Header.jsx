@@ -85,8 +85,8 @@ export default function Header({ onOpenSidebar }) {
 
           {/* Name and Role Subtitle */}
           <div className="hidden sm:flex flex-col min-w-0 pr-1">
-            <span className="font-semibold text-xs sm:text-sm text-foreground leading-tight truncate max-w-[150px]">
-              {user?.nama || 'User'}
+            <span className="font-semibold text-xs sm:text-sm text-foreground leading-tight truncate max-w-[150px] uppercase">
+              {(user?.nama || user?.username || 'User').toUpperCase()}
             </span>
             <span className="text-[9.5px] font-bold text-muted-foreground uppercase tracking-wider leading-none mt-0.5">
               {formatRole(user?.role)}

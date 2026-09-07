@@ -113,7 +113,7 @@ export default function DashboardPage() {
             Dashboard Operasional
           </h2>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Ringkasan statistik dan aktivitas sounding muatan kapal CPO Tanker.
+            Selamat datang, <span className="font-bold text-foreground uppercase">{(user?.nama || user?.username || '').toUpperCase()}</span>. Ringkasan statistik dan aktivitas sounding muatan kapal CPO Tanker.
           </p>
         </div>
 
@@ -210,7 +210,7 @@ export default function DashboardPage() {
           sub={stats?.pengirimanBerlayar > 0 ? `${stats.pengirimanBerlayar} Kapal Aktif di Laut` : 'Tidak ada kapal berlayar'}
         />
         <StatCard
-          label="Selesai (Discharged)"
+          label="Selesai"
           value={stats?.pengirimanSelesai ?? 0}
           icon={CheckCircle}
           color="bg-emerald-600"

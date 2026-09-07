@@ -493,7 +493,7 @@ export default function KontakWaPage() {
               <p className="text-xs text-muted-foreground">
                 {isAdmin 
                   ? 'Manajemen Multi-Device Fonnte, Kontak Penerima & Template Laporan'
-                  : 'Kelola kontak pribadi relasi Anda & tautkan WhatsApp mandiri'}
+                  : 'Kelola Kontak Pribadi Anda & Tautkan Whatsapp Secara Mandiri'}
               </p>
             </div>
           </div>
@@ -816,7 +816,7 @@ export default function KontakWaPage() {
                         </span>
                       </div>
                       <div className="text-xs font-mono text-muted-foreground mt-0.5">
-                        Nomor: +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'} ({myDevice.nama})
+                        Nomor: +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}
                       </div>
                     </div>
                   </div>
@@ -830,22 +830,11 @@ export default function KontakWaPage() {
 
                 <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs text-muted-foreground space-y-1">
                   <div className="font-semibold text-foreground flex items-center gap-1.5">
-                    <Sparkles size={13} className="text-amber-500" /> Siap Mengirim Laporan:
+                    <CheckCircle2 size={14} className="text-green-500" /> Siap Mengirim Laporan:
                   </div>
                   <p>
                     Setiap kali Anda menekan tombol <strong>Kirim via Bot Server</strong> di halaman pengiriman, laporan & PDF akan terkirim langsung dari nomor WhatsApp Anda.
                   </p>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setTestModal({ open: true, device: myDevice, target: user?.kontakWa || myDevice.nomorWa || '', loading: false })}
-                    className="px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-xs font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-                  >
-                    <Send size={13} />
-                    <span>Tes Kirim Pesan Uji Coba</span>
-                  </button>
                 </div>
               </div>
             ) : (
