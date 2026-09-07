@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { Navigate } from 'react-router-dom'
 import {
   getKontakWa, createKontakWa, updateKontakWa, deleteKontakWa,
   getDevicesWA, addDeviceWAAuto, addDeviceWAManual, getDeviceWAQr,
@@ -20,6 +21,11 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 export default function KontakWaPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'ADMIN'
+
+  // Akses halaman hanya untuk ADMIN dan SURVEYOR
+  if (user && user.role !== 'ADMIN' && user.role !== 'SURVEYOR') {
+    return <Navigate to="/dashboard" replace />
+  }
 
   // Active Tab:
   // Admin: 'pengirim' | 'penerima' | 'template'
@@ -169,11 +175,17 @@ export default function KontakWaPage() {
 
   const handleConnectMyDeviceQr = async () => {
     setConnectingMyDevice(true)
-    setQrModal({ open: true, device: { nama: `WA - ${user?.nama || 'Saya'}` }, qrUrl: null, loading: true })
+    setQrModal({ open: true, device: { nama: `WA - ${user?.nama || 'Saya'}` }, qrUrl: null, loading: true, isMyDevice: true })
     if (qrPollRef.current) clearInterval(qrPollRef.current)
 
     try {
       const res = await requestMyDeviceWAQr()
+      if (res.data?.alreadyConnected) {
+        toast.success('WhatsApp Anda sudah terhubung! 🎉')
+        setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
+        loadMyDevice()
+        return
+      }
       setQrModal(prev => ({ ...prev, qrUrl: res.data.url, loading: false }))
 
       // Polling cek status tiap 3 detik
@@ -183,7 +195,7 @@ export default function KontakWaPage() {
           if (statusRes.data?.connected) {
             clearInterval(qrPollRef.current)
             toast.success('WhatsApp Anda Berhasil Terhubung! 🎉')
-            setQrModal({ open: false, device: null, qrUrl: null, loading: false })
+            setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
             loadMyDevice()
           }
         } catch {
@@ -327,8 +339,13 @@ export default function KontakWaPage() {
 
   const handleCloseQrModal = () => {
     if (qrPollRef.current) clearInterval(qrPollRef.current)
-    setQrModal({ open: false, device: null, qrUrl: null, loading: false })
-    loadDevices()
+    const wasMyDevice = qrModal.isMyDevice
+    setQrModal({ open: false, device: null, qrUrl: null, loading: false, isMyDevice: false })
+    if (wasMyDevice || !isAdmin) {
+      loadMyDevice()
+    } else {
+      loadDevices()
+    }
   }
 
   const handleCheckDeviceStatus = async (device) => {
@@ -1327,16 +1344,22 @@ export default function KontakWaPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => handleOpenQr(qrModal.device)}
-                className="flex-1 h-9 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                onClick={() => {
+                  if (qrModal.isMyDevice || !isAdmin) {
+                    handleConnectMyDeviceQr()
+                  } else {
+                    handleOpenQr(qrModal.device)
+                  }
+                }}
+                className="flex-1 h-9 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
-                <RefreshCw size={13} />
+                <RefreshCw size={13} className={qrModal.loading ? 'animate-spin' : ''} />
                 <span>Segarkan QR</span>
               </button>
               <button
                 type="button"
                 onClick={handleCloseQrModal}
-                className="flex-1 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-xs"
+                className="flex-1 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-xs cursor-pointer"
               >
                 Selesai
               </button>
@@ -1476,18 +1499,21 @@ export default function KontakWaPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="aktifKontak"
-                  checked={formKontak.aktif}
-                  onChange={e => setFormKontak(f => ({ ...f, aktif: e.target.checked }))}
-                  className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
-                />
-                <label htmlFor="aktifKontak" className="text-xs font-semibold text-foreground cursor-pointer">
-                  Kontak Aktif (Dapat dipilih untuk pengiriman laporan)
-                </label>
-              </div>
+              {/* Checkbox status hanya muncul saat edit kontak. Saat tambah kontak baru, otomatis aktif */}
+              {editKontakId && (
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="aktifKontak"
+                    checked={formKontak.aktif}
+                    onChange={e => setFormKontak(f => ({ ...f, aktif: e.target.checked }))}
+                    className="w-4 h-4 text-primary rounded border-border focus:ring-primary cursor-pointer"
+                  />
+                  <label htmlFor="aktifKontak" className="text-xs font-semibold text-foreground cursor-pointer">
+                    Kontak Aktif (Dapat dipilih untuk pengiriman laporan)
+                  </label>
+                </div>
+              )}
 
               {isAdmin && (
                 <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10">

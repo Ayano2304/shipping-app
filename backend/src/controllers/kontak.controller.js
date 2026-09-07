@@ -24,17 +24,17 @@ exports.getAll = async (req, res) => {
       where.aktif = true;
     }
 
-    // Filter Privasi: Non-admin hanya melihat kontaknya sendiri + kontak kantor (isGlobal)
+    // Filter Privasi: Non-admin hanya melihat kontaknya sendiri + kontak kantor (isGlobal atau dibuat oleh admin)
     if (!isAdmin) {
       where.OR = [
         { userId: userId },
         { isGlobal: true },
-        { userId: null } // Legacy contacts
+        { user: { role: 'ADMIN' } }
       ];
     } else if (scope === 'mine') {
       where.userId = userId;
     } else if (scope === 'global') {
-      where.OR = [{ isGlobal: true }, { userId: null }];
+      where.OR = [{ isGlobal: true }, { user: { role: 'ADMIN' } }];
     }
 
     // Search query
@@ -118,7 +118,7 @@ exports.create = async (req, res) => {
         jabatan: jabatan ? jabatan.trim() : null,
         instansi: instansi ? instansi.trim() : null,
         catatan: catatan ? catatan.trim() : null,
-        aktif: aktif !== undefined ? Boolean(aktif) : true,
+        aktif: true, // Otomatis aktif saat penambahan kontak baru
         // Hanya admin yang bisa membuat kontak kantor/global
         isGlobal: isAdmin ? Boolean(isGlobal) : false,
         userId: req.user?.id || null,

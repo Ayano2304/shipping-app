@@ -12,13 +12,13 @@ const waLimiter = rateLimit({
   message: { error: 'Terlalu banyak permintaan kirim WhatsApp. Silakan tunggu beberapa saat.' },
 });
 
-// User Self-Service Device (Semua Role: ADMIN, PETUGAS, SURVEYOR)
-router.get('/my-device', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.getMyDevice);
-router.post('/my-device/qr', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.requestMyDeviceQr);
-router.post('/my-device/status', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.checkMyDeviceStatus);
-router.post('/my-device/disconnect', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.disconnectMyDevice);
-router.post('/my-device/token', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.saveMyDeviceToken);
-router.post('/my-device/test', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), waLimiter, whatsappController.testMyDevice);
+// User Self-Service Device (Hanya Role: ADMIN, SURVEYOR)
+router.get('/my-device', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.getMyDevice);
+router.post('/my-device/qr', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.requestMyDeviceQr);
+router.post('/my-device/status', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.checkMyDeviceStatus);
+router.post('/my-device/disconnect', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.disconnectMyDevice);
+router.post('/my-device/token', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.saveMyDeviceToken);
+router.post('/my-device/test', auth, roleGuard('ADMIN', 'SURVEYOR'), waLimiter, whatsappController.testMyDevice);
 
 // Device Management (Multi-Device Fonnte Admin)
 router.get('/devices', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.getDevices);
