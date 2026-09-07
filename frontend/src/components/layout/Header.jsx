@@ -25,7 +25,7 @@ export default function Header({ onOpenSidebar }) {
   const label = getHeaderLabel(pathname)
 
   return (
-    <header className="h-16 border-b border-border bg-card/75 backdrop-blur flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0 transition-colors z-30 w-full max-w-full overflow-hidden">
+    <header className="h-16 border-b border-border bg-card/75 backdrop-blur flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0 transition-colors z-40 w-full max-w-full">
       {/* Left side: Normal Hamburger Menu Icon (mobile only) + Page Title */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
