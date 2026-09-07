@@ -1,7 +1,6 @@
 import { useLocation } from 'react-router-dom'
-import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
-import { Menu, Sun, Moon, User } from 'lucide-react'
+import { Menu, Sun, Moon } from 'lucide-react'
 import NotificationDropdown from './NotificationDropdown'
 
 const getHeaderLabel = (pathname) => {
@@ -19,39 +18,31 @@ const getHeaderLabel = (pathname) => {
   return 'CPO Tanker'
 }
 
-const formatRole = (role) => {
-  if (role === 'ADMIN') return 'ADMINISTRATOR'
-  if (role === 'PETUGAS') return 'PETUGAS MUAT'
-  if (role === 'SURVEYOR') return 'SURVEYOR BONGKAR'
-  return role || 'PENGGUNA'
-}
-
 export default function Header({ onOpenSidebar }) {
   const { pathname } = useLocation()
-  const { user } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
 
   const label = getHeaderLabel(pathname)
 
   return (
     <header className="h-16 border-b border-border bg-card/75 backdrop-blur flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0 transition-colors z-30">
-      {/* Left side: Hamburger (mobile only) + Page Title aligned in the exact same flex row */}
+      {/* Left side: Normal Hamburger Menu Icon (mobile only) + Page Title */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           type="button"
           onClick={onOpenSidebar}
           aria-label="Buka Menu"
-          className="md:hidden w-8.5 h-8.5 sm:w-9 sm:h-9 bg-card border border-border rounded-lg flex items-center justify-center text-foreground hover:bg-secondary active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
+          className="md:hidden p-2 -ml-1 text-foreground hover:bg-secondary rounded-xl active:scale-95 transition-all shrink-0 cursor-pointer"
         >
-          <Menu size={18} />
+          <Menu size={22} />
         </button>
-        <h1 className="text-sm sm:text-base font-semibold text-foreground leading-none truncate max-w-[130px] xs:max-w-[190px] sm:max-w-none">
+        <h1 className="text-sm sm:text-base font-bold text-foreground leading-none truncate max-w-[170px] xs:max-w-[220px] sm:max-w-none">
           {label}
         </h1>
       </div>
 
-      {/* Right side: Notification + Theme Toggle + Static User Status Pill */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      {/* Right side: Notification + Theme Toggle */}
+      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
         {/* Notification Bell Dropdown */}
         <NotificationDropdown />
 
@@ -61,41 +52,21 @@ export default function Header({ onOpenSidebar }) {
           onClick={(e) => toggleTheme(e)}
           title={theme === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
           aria-label="Toggle Theme"
-          className="relative w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl border border-border bg-card hover:bg-secondary flex items-center justify-center text-foreground transition-all active:scale-90 shadow-xs overflow-hidden group cursor-pointer shrink-0"
+          className="relative w-9 h-9 rounded-xl border border-border bg-card hover:bg-secondary flex items-center justify-center text-foreground transition-all active:scale-90 shadow-xs overflow-hidden group cursor-pointer shrink-0"
         >
           <Sun
-            size={16}
+            size={17}
             className={`absolute text-amber-400 transition-all duration-500 transform ${
               theme === 'dark' ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-0 opacity-0'
             }`}
           />
           <Moon
-            size={16}
+            size={17}
             className={`absolute text-indigo-600 transition-all duration-500 transform ${
               theme === 'dark' ? 'rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'
             }`}
           />
         </button>
-
-        {/* User Identity Pill (Static Active User Display) */}
-        <div className="flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-border/80 bg-secondary/40 select-none shadow-xs shrink-0">
-          {/* Avatar with green online dot */}
-          <div className="relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-background border border-border/80 text-foreground shrink-0 shadow-inner">
-            <User size={14} className="text-foreground/80" />
-            {/* Online Green Dot */}
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-card shadow-xs animate-pulse" />
-          </div>
-
-          {/* Name and Role Subtitle */}
-          <div className="hidden sm:flex flex-col min-w-0 pr-1">
-            <span className="font-semibold text-xs sm:text-sm text-foreground leading-tight truncate max-w-[150px] uppercase">
-              {(user?.nama || user?.username || 'User').toUpperCase()}
-            </span>
-            <span className="text-[9.5px] font-bold text-muted-foreground uppercase tracking-wider leading-none mt-0.5">
-              {formatRole(user?.role)}
-            </span>
-          </div>
-        </div>
       </div>
     </header>
   )
