@@ -1858,7 +1858,7 @@ export default function KontakWaPage() {
             )}
 
             {/* Bottom Actions */}
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => {
@@ -1869,15 +1869,15 @@ export default function KontakWaPage() {
                   }
                 }}
                 disabled={qrModal.loading}
-                className="flex-1 h-9.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                className="flex-1 h-11 px-4 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-50 active:scale-98"
               >
-                <RefreshCw size={13} className={qrModal.loading ? 'animate-spin' : ''} />
+                <RefreshCw size={14} className={qrModal.loading ? 'animate-spin' : ''} />
                 <span>Segarkan {qrModal.type === 'code' ? 'Kode' : 'QR'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleCloseQrModal}
-                className="flex-1 h-9.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-xs cursor-pointer"
+                className="flex-1 h-11 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-98"
               >
                 Selesai
               </button>
@@ -2218,7 +2218,7 @@ export default function KontakWaPage() {
                 <button
                   type="submit"
                   disabled={submittingBlacklist || !formBlacklist.nomorWa.trim()}
-                  className="px-4 h-8.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="px-4 h-9 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
                 >
                   {submittingBlacklist ? <Loader2 size={13} className="animate-spin" /> : <Ban size={13} />}
                   <span>Tambahkan ke Blacklist</span>
