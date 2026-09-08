@@ -166,6 +166,7 @@ model DeviceWa {
   token     String   @unique @db.VarChar(255)
   nomorWa   String?  @map("nomor_wa") @db.VarChar(50)
   status    String   @default("disconnected") @db.VarChar(50)
+  izinKirim Boolean  @default(true) @map("izin_kirim")
   isDefault Boolean  @default(false) @map("is_default")
   userId    Int?     @map("user_id")
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -173,6 +174,17 @@ model DeviceWa {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("device_wa")
+}
+
+// Tabel Daftar Blokir Nomor WhatsApp (Blacklist)
+model BlacklistWa {
+  id        Int      @id @default(autoincrement())
+  nomorWa   String   @unique @map("nomor_wa") @db.VarChar(50)
+  alasan    String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("blacklist_wa")
 }
 
 enum Role {

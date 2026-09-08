@@ -78,8 +78,14 @@ export const getDeviceWAQr = (id, params) => api.get(`/whatsapp/devices/${id}/qr
 export const checkDeviceWAStatus = (id) => api.post(`/whatsapp/devices/${id}/status`)
 export const disconnectDeviceWA = (id) => api.post(`/whatsapp/devices/${id}/disconnect`)
 export const setDefaultDeviceWA = (id) => api.put(`/whatsapp/devices/${id}/default`)
+export const toggleDeviceIzinKirim = (id) => api.put(`/whatsapp/devices/${id}/toggle-izin`)
 export const deleteDeviceWA = (id) => api.delete(`/whatsapp/devices/${id}`)
 export const testDeviceWA = (id, data) => api.post(`/whatsapp/devices/${id}/test`, data)
+
+// Blacklist WhatsApp
+export const getBlacklistWA = () => api.get('/whatsapp/blacklist')
+export const addBlacklistWA = (data) => api.post('/whatsapp/blacklist', data)
+export const deleteBlacklistWA = (id) => api.delete(`/whatsapp/blacklist/${id}`)
 
 // User Self-Service Device WhatsApp
 export const getMyDeviceWA = () => api.get('/whatsapp/my-device')

@@ -241,7 +241,14 @@ const resolveSenderToken = async (req, deviceId) => {
 // 1. Ambil Semua Perangkat WhatsApp Terdaftar
 exports.getDevices = async (req, res) => {
   try {
+    const { activeOnly } = req.query;
+    const where = {};
+    if (activeOnly === 'true') {
+      where.status = { in: ['connected', 'connect'] };
+    }
+
     const devices = await prisma.deviceWa.findMany({
+      where,
       include: {
         user: { select: { id: true, nama: true, username: true, role: true } }
       },
@@ -263,6 +270,20 @@ exports.addDeviceAuto = async (req, res) => {
     }
     if (!device || !device.trim()) {
       return res.status(400).json({ error: 'Nomor HP / identifier device wajib diisi.' });
+    }
+
+    let rawPhone = device.trim().replace(/[^0-9]/g, '');
+    if (rawPhone.startsWith('08')) rawPhone = '628' + rawPhone.slice(2);
+    else if (rawPhone.startsWith('8')) rawPhone = '628' + rawPhone.slice(1);
+
+    // Cek blacklist
+    const isBlocked = await prisma.blacklistWa.findFirst({
+      where: { nomorWa: rawPhone }
+    });
+    if (isBlocked) {
+      return res.status(403).json({
+        error: `Nomor WhatsApp (+${rawPhone}) masuk dalam daftar blokir (Blacklist) Administrator. Alasan: ${isBlocked.alasan || 'Pelanggaran kebijakan'}.`
+      });
     }
 
     const accountToken = (customAccountToken && customAccountToken.trim()) 
@@ -532,6 +553,121 @@ exports.deleteDevice = async (req, res) => {
   }
 };
 
+// 8b. Toggle Izin Kirim Pesan untuk Perangkat (Admin Control)
+exports.toggleDeviceIzinKirim = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const device = await prisma.deviceWa.findUnique({ where: { id: parseInt(id) } });
+    if (!device) return res.status(404).json({ error: 'Perangkat tidak ditemukan.' });
+
+    const newIzin = !device.izinKirim;
+    const updated = await prisma.deviceWa.update({
+      where: { id: parseInt(id) },
+      data: { izinKirim: newIzin }
+    });
+
+    res.json({
+      success: true,
+      message: `Izin kirim perangkat ${device.nama} berhasil ${newIzin ? 'diaktifkan' : 'ditangguhkan'}.`,
+      device: updated
+    });
+  } catch (err) {
+    console.error('toggleDeviceIzinKirim error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── BLACKLIST NOMOR WHATSAPP (ADMIN CONTROL) ───
+
+// Ambil Daftar Nomor yang Diblokir
+exports.getBlacklist = async (req, res) => {
+  try {
+    const list = await prisma.blacklistWa.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(list);
+  } catch (err) {
+    console.error('getBlacklist error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Tambah Nomor ke Daftar Blokir
+exports.addBlacklist = async (req, res) => {
+  try {
+    const { nomorWa, alasan } = req.body;
+    if (!nomorWa || !nomorWa.toString().trim()) {
+      return res.status(400).json({ error: 'Nomor WhatsApp wajib diisi.' });
+    }
+
+    let clean = nomorWa.toString().trim().replace(/[^0-9]/g, '');
+    if (clean.startsWith('08')) clean = '628' + clean.slice(2);
+    else if (clean.startsWith('8')) clean = '628' + clean.slice(1);
+
+    if (!clean || clean.length < 8) {
+      return res.status(400).json({ error: 'Format nomor WhatsApp tidak valid.' });
+    }
+
+    const existing = await prisma.blacklistWa.findUnique({ where: { nomorWa: clean } });
+    if (existing) {
+      return res.status(400).json({ error: `Nomor +${clean} sudah ada dalam daftar blokir.` });
+    }
+
+    const blacklisted = await prisma.blacklistWa.create({
+      data: {
+        nomorWa: clean,
+        alasan: (alasan && alasan.trim()) || 'Diblokir oleh Administrator'
+      }
+    });
+
+    // Putuskan dan nonaktifkan izin kirim jika ada perangkat yang cocok dengan nomor ini
+    const matchedDevices = await prisma.deviceWa.findMany({
+      where: {
+        nomorWa: { contains: clean }
+      }
+    });
+
+    for (const dev of matchedDevices) {
+      try {
+        await fetch('https://api.fonnte.com/disconnect', {
+          method: 'POST',
+          headers: { 'Authorization': dev.token }
+        });
+      } catch (e) {
+        // silent ignore
+      }
+      await prisma.deviceWa.update({
+        where: { id: dev.id },
+        data: {
+          status: 'disconnected',
+          izinKirim: false
+        }
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Nomor +${clean} berhasil ditambahkan ke daftar blokir (Blacklist).`,
+      data: blacklisted
+    });
+  } catch (err) {
+    console.error('addBlacklist error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Hapus Nomor dari Daftar Blokir
+exports.deleteBlacklist = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.blacklistWa.delete({ where: { id: parseInt(id) } });
+    res.json({ success: true, message: 'Nomor berhasil dihapus dari daftar blokir.' });
+  } catch (err) {
+    console.error('deleteBlacklist error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // 9. Tes Kirim Pesan untuk Perangkat Spesifik
 exports.testDevice = async (req, res) => {
   try {
@@ -630,6 +766,19 @@ exports.requestMyDeviceQr = async (req, res) => {
       if (raw.startsWith('08')) raw = '628' + raw.slice(2);
       else if (raw.startsWith('8')) raw = '628' + raw.slice(1);
       formattedPhone = raw;
+    }
+
+    // Cek apakah nomor masuk dalam daftar blacklist
+    if (formattedPhone) {
+      const isBlocked = await prisma.blacklistWa.findFirst({
+        where: { nomorWa: formattedPhone }
+      });
+      if (isBlocked) {
+        return res.status(403).json({
+          error: `Nomor WhatsApp (+${formattedPhone}) telah diblokir (Blacklist) oleh Administrator. Alasan: ${isBlocked.alasan || 'Pelanggaran kebijakan'}. Silakan hubungi Admin.`,
+          code: 'NUMBER_BLACKLISTED'
+        });
+      }
     }
 
     // Jika user menginput nomor baru yang berbeda dengan user.kontakWa, update profil user
@@ -943,6 +1092,18 @@ exports.saveMyDeviceToken = async (req, res) => {
     const isConnected = fonnteData.status && (fonnteData.device_status === 'connect' || fonnteData.device_status === 'connected');
     const nomor = fonnteData.device || null;
 
+    if (nomor) {
+      const cleanNomor = nomor.replace(/[^0-9]/g, '');
+      const isBlocked = await prisma.blacklistWa.findFirst({
+        where: { nomorWa: cleanNomor }
+      });
+      if (isBlocked) {
+        return res.status(403).json({
+          error: `Nomor WhatsApp perangkat ini (+${cleanNomor}) masuk dalam daftar blokir (Blacklist) Administrator. Alasan: ${isBlocked.alasan || 'Pelanggaran kebijakan'}.`
+        });
+      }
+    }
+
     const existing = await prisma.deviceWa.findFirst({ where: { userId: user.id } });
     let device;
     if (existing) {
@@ -985,6 +1146,12 @@ exports.testMyDevice = async (req, res) => {
     const user = req.user;
     const device = await prisma.deviceWa.findFirst({ where: { userId: user.id } });
     if (!device) return res.status(404).json({ error: 'Perangkat WhatsApp Anda belum terdaftar.' });
+
+    if (device.izinKirim === false) {
+      return res.status(403).json({
+        error: 'Izin pengiriman pesan WhatsApp untuk akun Anda sedang ditangguhkan oleh Administrator. Silakan hubungi Admin.'
+      });
+    }
 
     const { tujuanWa } = req.body;
     const target = tujuanWa || device.nomorWa || user.kontakWa;
@@ -1120,6 +1287,12 @@ exports.kirimLaporan = async (req, res) => {
     if (!fonnteToken) {
       return res.status(400).json({
         error: 'Tidak ada Akun WhatsApp pengirim yang aktif. Silakan tambahkan dan hubungkan akun WhatsApp di menu Pusat WhatsApp.'
+      });
+    }
+
+    if (senderDevice && senderDevice.izinKirim === false) {
+      return res.status(403).json({
+        error: `Pengiriman laporan WhatsApp dari akun Anda (${senderDevice.nama}) sedang ditangguhkan/dinonaktifkan oleh Administrator. Silakan hubungi Admin.`
       });
     }
 

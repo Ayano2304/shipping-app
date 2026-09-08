@@ -3,7 +3,8 @@ import { Navigate } from 'react-router-dom'
 import {
   getKontakWa, createKontakWa, updateKontakWa, deleteKontakWa,
   getDevicesWA, addDeviceWAAuto, addDeviceWAManual, getDeviceWAQr,
-  checkDeviceWAStatus, disconnectDeviceWA, setDefaultDeviceWA, deleteDeviceWA, testDeviceWA,
+  checkDeviceWAStatus, disconnectDeviceWA, setDefaultDeviceWA, toggleDeviceIzinKirim, deleteDeviceWA, testDeviceWA,
+  getBlacklistWA, addBlacklistWA, deleteBlacklistWA,
   getMyDeviceWA, requestMyDeviceWAQr, checkMyDeviceWAStatus, disconnectMyDeviceWA, testMyDeviceWA,
   getWATemplates, createWATemplate, updateWATemplate, deleteWATemplate,
   getUsers
@@ -14,7 +15,8 @@ import {
   Contact, Plus, Search, Pencil, Trash2, Loader2, Phone,
   Building2, Briefcase, MessageSquare, CheckCircle2, XCircle,
   X, AlertTriangle, QrCode, RefreshCw, Send, Smartphone, Star,
-  UserCheck, Shield, Bookmark, Sparkles, Copy, Check, Lock, Hash
+  UserCheck, Shield, Bookmark, Sparkles, Copy, Check, Lock, Hash,
+  Ban, ShieldAlert, ShieldOff
 } from 'lucide-react'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 
@@ -55,6 +57,15 @@ export default function KontakWaPage() {
   const [formDevice, setFormDevice] = useState({
     nama: '', device: '', token: '', userId: '', isDefault: false, accountToken: ''
   })
+
+  // ─── BLACKLIST WHATSAPP STATE (ADMIN VIEW) ───
+  const [blacklistList, setBlacklistList] = useState([])
+  const [loadingBlacklist, setLoadingBlacklist] = useState(false)
+  const [modalBlacklistOpen, setModalBlacklistOpen] = useState(false)
+  const [formBlacklist, setFormBlacklist] = useState({ nomorWa: '', alasan: '' })
+  const [submittingBlacklist, setSubmittingBlacklist] = useState(false)
+  const [confirmDeleteBlacklist, setConfirmDeleteBlacklist] = useState(null)
+  const [confirmBlacklistDevice, setConfirmBlacklistDevice] = useState(null)
 
   // ─── TAB 2B: WHATSAPP SAYA (NON-ADMIN / SURVEYOR VIEW) STATE ───
   const [myDevice, setMyDevice] = useState(null)
@@ -143,9 +154,23 @@ export default function KontakWaPage() {
     }
   }
 
+  const loadBlacklist = async () => {
+    if (!isAdmin) return
+    try {
+      setLoadingBlacklist(true)
+      const res = await getBlacklistWA()
+      setBlacklistList(res.data || [])
+    } catch {
+      // silent
+    } finally {
+      setLoadingBlacklist(false)
+    }
+  }
+
   useEffect(() => {
     if (isAdmin) {
       loadDevices()
+      loadBlacklist()
     } else {
       loadMyDevice()
     }
@@ -463,6 +488,65 @@ export default function KontakWaPage() {
     }
   }
 
+  const handleToggleIzinKirim = async (device) => {
+    try {
+      const res = await toggleDeviceIzinKirim(device.id)
+      toast.success(res.data?.message || 'Status izin kirim berhasil diperbarui!')
+      loadDevices()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal mengubah status izin kirim.')
+    }
+  }
+
+  const handleAddBlacklist = async (e) => {
+    e?.preventDefault()
+    if (!formBlacklist.nomorWa.trim()) {
+      toast.error('Nomor WhatsApp wajib diisi.')
+      return
+    }
+
+    try {
+      setSubmittingBlacklist(true)
+      const res = await addBlacklistWA(formBlacklist)
+      toast.success(res.data?.message || 'Nomor berhasil dimasukkan ke daftar blokir!')
+      setFormBlacklist({ nomorWa: '', alasan: '' })
+      loadBlacklist()
+      loadDevices()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal memblokir nomor.')
+    } finally {
+      setSubmittingBlacklist(false)
+    }
+  }
+
+  const handleDeleteBlacklist = async () => {
+    if (!confirmDeleteBlacklist) return
+    try {
+      await deleteBlacklistWA(confirmDeleteBlacklist.id)
+      toast.success('Nomor berhasil dihapus dari daftar blokir.')
+      setConfirmDeleteBlacklist(null)
+      loadBlacklist()
+    } catch {
+      toast.error('Gagal menghapus nomor dari daftar blokir.')
+    }
+  }
+
+  const handleQuickBlacklist = async () => {
+    if (!confirmBlacklistDevice) return
+    try {
+      await addBlacklistWA({
+        nomorWa: confirmBlacklistDevice.nomorWa,
+        alasan: `Diblokir Admin dari akun "${confirmBlacklistDevice.nama}"`
+      })
+      toast.success(`Nomor ${confirmBlacklistDevice.nomorWa} berhasil diblokir dan koneksinya diputus.`)
+      setConfirmBlacklistDevice(null)
+      loadBlacklist()
+      loadDevices()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal memblokir nomor perangkat.')
+    }
+  }
+
   const handleSendTestMessage = async (e) => {
     e.preventDefault()
     if (!testModal.target.trim()) {
@@ -539,6 +623,9 @@ export default function KontakWaPage() {
   const inputCls = "w-full h-10 px-3 bg-secondary border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
   const labelCls = "block text-xs font-semibold text-foreground mb-1.5"
 
+  // Filter akun WhatsApp pengirim yang aktif saja
+  const activeDevices = devicesList.filter(d => d.status === 'connected' || d.status === 'connect')
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* 1. Header & Quick Info */}
@@ -575,11 +662,11 @@ export default function KontakWaPage() {
               <Smartphone size={14} className={activeTab === 'pengirim' ? 'text-primary' : ''} />
               <span>Akun Pengirim</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                devicesList.some(d => d.status === 'connected')
+                activeDevices.length > 0
                   ? 'bg-green-500/20 text-green-700 dark:text-green-300'
                   : 'bg-muted text-muted-foreground'
               }`}>
-                {devicesList.length}
+                {activeDevices.length}
               </span>
             </button>
           ) : (
@@ -651,7 +738,7 @@ export default function KontakWaPage() {
                 Hubungkan nomor WhatsApp Admin atau Surveyor untuk mengirim notifikasi sounding & broadcast secara otomatis.
               </p>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
               <button
                 onClick={loadDevices}
                 disabled={loadingDevices}
@@ -660,6 +747,22 @@ export default function KontakWaPage() {
               >
                 <RefreshCw size={13} className={loadingDevices ? 'animate-spin' : ''} />
                 <span className="hidden sm:inline">Refresh</span>
+              </button>
+              <button
+                onClick={() => {
+                  loadBlacklist()
+                  setModalBlacklistOpen(true)
+                }}
+                className="px-3 h-9 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                title="Kelola Daftar Nomor yang Diblokir (Blacklist)"
+              >
+                <Shield size={14} />
+                <span>Daftar Blokir</span>
+                {blacklistList.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px] font-bold">
+                    {blacklistList.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => {
@@ -674,32 +777,34 @@ export default function KontakWaPage() {
             </div>
           </div>
 
-          {/* List of Devices */}
+          {/* List of Active Devices Only */}
           {loadingDevices ? (
             <div className="flex flex-col items-center justify-center h-48 bg-card border border-border rounded-2xl">
               <Loader2 size={28} className="animate-spin text-primary mb-2" />
               <div className="text-xs text-muted-foreground">Memuat data perangkat WhatsApp...</div>
             </div>
-          ) : devicesList.length === 0 ? (
+          ) : activeDevices.length === 0 ? (
             <div className="text-center py-16 bg-card border border-dashed border-border rounded-2xl p-6">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400 mx-auto mb-3">
                 <Smartphone size={24} />
               </div>
-              <h3 className="text-sm font-bold text-foreground">Belum Ada Perangkat WhatsApp Terdaftar</h3>
+              <h3 className="text-sm font-bold text-foreground">Tidak Ada Akun WhatsApp Pengirim yang Aktif</h3>
               <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-4">
-                Tambahkan akun WhatsApp pertama Anda sekarang. Anda bisa menghubungkan nomor Admin atau nomor Surveyor via Fonnte tanpa perlu membuka dashboard Fonnte.
+                Hanya akun WhatsApp yang sedang aktif dan terhubung yang ditampilkan di sini. Ketika Surveyor atau Admin menautkan WhatsApp, akun aktif akan otomatis muncul.
               </p>
               <button
-                onClick={() => setModalAddDevice(true)}
+                onClick={() => {
+                  setFormDevice({ nama: '', device: '', token: '', userId: '', isDefault: devicesList.length === 0, accountToken: '' })
+                  setModalAddDevice(true)
+                }}
                 className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
               >
-                <Plus size={14} /> Tambah WhatsApp Sekarang
+                <Plus size={14} /> Tambah WhatsApp Baru
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {devicesList.map((dev) => {
-                const isConnected = dev.status === 'connected' || dev.status === 'connect'
+              {activeDevices.map((dev) => {
                 return (
                   <div
                     key={dev.id}
@@ -713,21 +818,17 @@ export default function KontakWaPage() {
                       {/* Top Header Card */}
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-3">
-                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
-                            isConnected
-                              ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-                              : 'bg-red-500/10 text-red-600 dark:text-red-400'
-                          }`}>
+                          <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs bg-green-500/15 text-green-600 dark:text-green-400">
                             <Smartphone size={22} />
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="text-sm font-bold text-foreground leading-tight">
                                 {dev.nama}
                               </h3>
                               {dev.isDefault && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/20">
-                                  <Star size={10} className="fill-primary" /> Pengirim Default
+                                  <Star size={10} className="fill-primary" /> Default
                                 </span>
                               )}
                             </div>
@@ -738,22 +839,26 @@ export default function KontakWaPage() {
                         </div>
 
                         {/* Status Badge */}
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
-                          isConnected
-                            ? 'bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30'
-                            : 'bg-red-500/10 text-red-700 dark:text-red-300 border border-red-500/20'
-                        }`}>
-                          {isConnected ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-                          <span>{isConnected ? 'Terhubung' : 'Terputus'}</span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30">
+                          <CheckCircle2 size={12} />
+                          <span>Terhubung</span>
                         </span>
                       </div>
 
-                      {/* Detail Info User Binding */}
+                      {/* Detail Info User Binding & Izin Kirim */}
                       <div className="bg-secondary/60 rounded-xl p-3 text-xs space-y-1.5 border border-border/50 mb-4">
                         <div className="flex items-center justify-between text-muted-foreground">
                           <span>Ditautkan ke Petugas:</span>
                           <span className="font-semibold text-foreground">
                             {dev.user ? `${dev.user.nama} (${dev.user.role})` : 'Semua Petugas (Umum)'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-muted-foreground">
+                          <span>Status Pengiriman Bot:</span>
+                          <span className={`font-semibold flex items-center gap-1 ${
+                            dev.izinKirim !== false ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {dev.izinKirim !== false ? '🟢 Diizinkan' : '🔴 Ditangguhkan'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-muted-foreground">
@@ -765,38 +870,37 @@ export default function KontakWaPage() {
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Action Buttons: Tanpa Scan QR, Cek, dan Tes. Dilengkapi Sakelar Izin Kirim & Blokir */}
                     <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenQr(dev)}
-                          className="px-3 h-8.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95"
-                          title="Scan QR Code WhatsApp"
-                        >
-                          <QrCode size={13} />
-                          <span>Scan QR</span>
-                        </button>
-                        <button
-                          onClick={() => handleCheckDeviceStatus(dev)}
-                          className="px-2.5 h-8.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Cek Status Koneksi Real-time"
-                        >
-                          <RefreshCw size={12} />
-                          <span className="hidden sm:inline">Cek</span>
-                        </button>
-                        <button
-                          onClick={() => setTestModal({ open: true, device: dev, target: '', loading: false })}
-                          className="px-2.5 h-8.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Kirim Pesan Tes"
-                        >
-                          <Send size={12} />
-                          <span className="hidden sm:inline">Tes</span>
-                        </button>
-                      </div>
+                      {/* Sakelar Kontrol Izin Kirim Pesan */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleIzinKirim(dev)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                          dev.izinKirim !== false
+                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25'
+                            : 'bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30 hover:bg-red-500/25'
+                        }`}
+                        title="Klik untuk mengubah status izin kirim laporan"
+                      >
+                        {dev.izinKirim !== false ? (
+                          <>
+                            <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                            <span>Izin Kirim: Aktif</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle size={13} className="text-red-600 dark:text-red-400" />
+                            <span>Izin Kirim: Ditangguhkan</span>
+                          </>
+                        )}
+                      </button>
 
+                      {/* Tombol Aksi: Bintang Default, Blokir (Blacklist), Putuskan, Hapus */}
                       <div className="flex items-center gap-1">
                         {!dev.isDefault && (
                           <button
+                            type="button"
                             onClick={() => handleSetDefaultDevice(dev)}
                             className="p-2 rounded-xl text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer"
                             title="Jadikan Pengirim Default"
@@ -804,16 +908,26 @@ export default function KontakWaPage() {
                             <Star size={15} />
                           </button>
                         )}
-                        {isConnected && (
+                        {dev.nomorWa && (
                           <button
-                            onClick={() => handleDisconnectDevice(dev)}
-                            className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                            title="Putuskan Koneksi (Disconnect)"
+                            type="button"
+                            onClick={() => setConfirmBlacklistDevice(dev)}
+                            className="p-2 rounded-xl text-muted-foreground hover:text-red-600 hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Blokir Nomor WhatsApp Ini (Blacklist)"
                           >
-                            <XCircle size={15} />
+                            <Ban size={15} />
                           </button>
                         )}
                         <button
+                          type="button"
+                          onClick={() => handleDisconnectDevice(dev)}
+                          className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          title="Putuskan Koneksi (Disconnect)"
+                        >
+                          <XCircle size={15} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setConfirmDeleteDevice(dev)}
                           className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                           title="Hapus Perangkat"
@@ -890,14 +1004,26 @@ export default function KontakWaPage() {
                   </button>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs text-muted-foreground space-y-1">
-                  <div className="font-semibold text-foreground flex items-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-green-500" /> Siap Mengirim Laporan:
+                {myDevice.izinKirim === false ? (
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100">
+                      <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>Izin Pengiriman Ditangguhkan oleh Administrator</span>
+                    </div>
+                    <p className="leading-relaxed">
+                      WhatsApp Anda terhubung ke server, namun saat ini Administrator menangguhkan izin pengiriman laporan untuk akun Anda. Anda belum dapat mengirim laporan via bot sampai Administrator mengaktifkannya kembali.
+                    </p>
                   </div>
-                  <p>
-                    Setiap kali Anda menekan tombol <strong>Kirim via Bot Server</strong> di halaman pengiriman, laporan & PDF akan terkirim langsung dari nomor WhatsApp Anda.
-                  </p>
-                </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs text-muted-foreground space-y-1">
+                    <div className="font-semibold text-foreground flex items-center gap-1.5">
+                      <CheckCircle2 size={14} className="text-green-500" /> Siap Mengirim Laporan:
+                    </div>
+                    <p>
+                      Setiap kali Anda menekan tombol <strong>Kirim via Bot Server</strong> di halaman pengiriman, laporan & PDF akan terkirim langsung dari nomor WhatsApp Anda.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -2026,6 +2152,177 @@ export default function KontakWaPage() {
           </div>
         </div>
       )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODAL: DAFTAR BLOKIR NOMOR WHATSAPP (BLACKLIST - ADMIN ONLY)  */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {modalBlacklistOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-xl p-5 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+                  <Shield size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Daftar Blokir Nomor WhatsApp (Blacklist)</h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Nomor di daftar ini tidak dapat dihubungkan ke sistem dan koneksinya akan diputus
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalBlacklistOpen(false)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Form Tambah Blacklist */}
+            <form onSubmit={handleAddBlacklist} className="p-3.5 bg-secondary/50 rounded-xl border border-border space-y-3">
+              <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Ban size={14} className="text-red-500" />
+                <span>Blokir Nomor WhatsApp Baru</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">
+                    Nomor WhatsApp <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formBlacklist.nomorWa}
+                    onChange={e => setFormBlacklist(f => ({ ...f, nomorWa: e.target.value }))}
+                    placeholder="Contoh: 08960536022..."
+                    className="w-full h-9 px-3 bg-card border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">
+                    Alasan Pemblokiran
+                  </label>
+                  <input
+                    type="text"
+                    value={formBlacklist.alasan}
+                    onChange={e => setFormBlacklist(f => ({ ...f, alasan: e.target.value }))}
+                    placeholder="Contoh: Nomor tidak resmi, spam..."
+                    className="w-full h-9 px-3 bg-card border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  disabled={submittingBlacklist || !formBlacklist.nomorWa.trim()}
+                  className="px-4 h-8.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                >
+                  {submittingBlacklist ? <Loader2 size={13} className="animate-spin" /> : <Ban size={13} />}
+                  <span>Tambahkan ke Blacklist</span>
+                </button>
+              </div>
+            </form>
+
+            {/* List of Blacklisted Numbers */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[160px] max-h-[300px]">
+              <div className="text-xs font-bold text-foreground flex items-center justify-between pb-1">
+                <span>Daftar Nomor yang Sedang Diblokir ({blacklistList.length}):</span>
+                <button
+                  type="button"
+                  onClick={loadBlacklist}
+                  disabled={loadingBlacklist}
+                  className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw size={11} className={loadingBlacklist ? 'animate-spin' : ''} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {loadingBlacklist ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Loader2 size={22} className="animate-spin text-primary mb-1.5" />
+                  <span className="text-xs text-muted-foreground">Memuat daftar blokir...</span>
+                </div>
+              ) : blacklistList.length === 0 ? (
+                <div className="text-center py-10 border border-dashed border-border rounded-xl p-4">
+                  <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center text-muted-foreground mx-auto mb-2">
+                    <Shield size={18} />
+                  </div>
+                  <div className="text-xs font-bold text-foreground">Tidak Ada Nomor dalam Daftar Blokir</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Semua nomor dapat ditautkan ke akun surveyor selama kuota Fonnte tersedia.
+                  </div>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/60 border border-border rounded-xl overflow-hidden bg-card">
+                  {blacklistList.map((item) => (
+                    <div key={item.id} className="p-3 flex items-center justify-between gap-3 hover:bg-secondary/40 transition-colors">
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                          <span className="font-mono">+{item.nomorWa}</span>
+                          <span className="px-1.5 py-0.2 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-[10px] font-bold">
+                            DIBLOKIR
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {item.alasan || 'Diblokir oleh Administrator'}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground font-mono">
+                          {new Date(item.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteBlacklist(item)}
+                        className="px-2.5 py-1.5 rounded-lg border border-border bg-secondary hover:bg-red-500/15 hover:text-red-600 hover:border-red-500/30 text-xs font-semibold transition-colors cursor-pointer shrink-0"
+                        title="Buka Blokir (Hapus dari Blacklist)"
+                      >
+                        Buka Blokir
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 border-t border-border flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModalBlacklistOpen(false)}
+                className="px-4 py-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Blacklist Device Quick Action */}
+      <ConfirmDialog
+        open={Boolean(confirmBlacklistDevice)}
+        onClose={() => setConfirmBlacklistDevice(null)}
+        onConfirm={handleQuickBlacklist}
+        title="Blokir Nomor WhatsApp Pengirim (Blacklist)"
+        message={`Apakah Anda yakin ingin memblokir nomor +${confirmBlacklistDevice?.nomorWa?.replace(/\D/g, '')} (${confirmBlacklistDevice?.nama})? Koneksi WhatsApp perangkat ini akan langsung diputuskan dan nomor tersebut tidak dapat ditautkan lagi ke sistem.`}
+        confirmText="Ya, Blokir Nomor Ini"
+        variant="danger"
+      />
+
+      {/* Confirm Unblock Blacklist */}
+      <ConfirmDialog
+        open={Boolean(confirmDeleteBlacklist)}
+        onClose={() => setConfirmDeleteBlacklist(null)}
+        onConfirm={handleDeleteBlacklist}
+        title="Buka Blokir Nomor WhatsApp"
+        message={`Apakah Anda yakin ingin menghapus nomor +${confirmDeleteBlacklist?.nomorWa} dari daftar blokir? Setelah dibuka, nomor ini dapat kembali ditautkan oleh surveyor.`}
+        confirmText="Buka Blokir"
+        variant="warning"
+      />
 
       {/* Confirm Delete Dialogs */}
       <ConfirmDialog

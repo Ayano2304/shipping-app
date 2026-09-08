@@ -28,8 +28,14 @@ router.get('/devices/:id/qr', auth, roleGuard('ADMIN'), whatsappController.getDe
 router.post('/devices/:id/status', auth, roleGuard('ADMIN'), whatsappController.checkDeviceStatusById);
 router.post('/devices/:id/disconnect', auth, roleGuard('ADMIN'), whatsappController.disconnectDevice);
 router.put('/devices/:id/default', auth, roleGuard('ADMIN'), whatsappController.setDefaultDevice);
+router.put('/devices/:id/toggle-izin', auth, roleGuard('ADMIN'), whatsappController.toggleDeviceIzinKirim);
 router.delete('/devices/:id', auth, roleGuard('ADMIN'), whatsappController.deleteDevice);
 router.post('/devices/:id/test', auth, roleGuard('ADMIN'), waLimiter, whatsappController.testDevice);
+
+// Blacklist Nomor WhatsApp (Admin Control)
+router.get('/blacklist', auth, roleGuard('ADMIN'), whatsappController.getBlacklist);
+router.post('/blacklist', auth, roleGuard('ADMIN'), whatsappController.addBlacklist);
+router.delete('/blacklist/:id', auth, roleGuard('ADMIN'), whatsappController.deleteBlacklist);
 
 // Legacy Device & Testing
 router.post('/status', auth, roleGuard('ADMIN', 'PETUGAS'), whatsappController.checkDeviceStatus);
