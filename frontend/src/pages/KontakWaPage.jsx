@@ -838,20 +838,23 @@ export default function KontakWaPage() {
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
               <button
-                onClick={loadDevices}
-                disabled={loadingDevices}
-                className="px-3 h-9 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                title="Refresh Daftar & Status"
+                onClick={() => {
+                  loadDevices()
+                  loadPengajuan()
+                }}
+                disabled={loadingDevices || loadingPengajuan}
+                className="px-3.5 h-9 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                title="Refresh Daftar & Status Pengajuan"
               >
-                <RefreshCw size={13} className={loadingDevices ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Refresh</span>
+                <RefreshCw size={13} className={loadingDevices || loadingPengajuan ? 'animate-spin' : ''} />
+                <span>Refresh</span>
               </button>
               <button
                 onClick={() => {
                   loadBlacklist()
                   setModalBlacklistOpen(true)
                 }}
-                className="px-3 h-9 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3.5 h-9 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 title="Kelola Daftar Nomor yang Diblokir (Blacklist)"
               >
                 <Shield size={14} />
@@ -861,16 +864,6 @@ export default function KontakWaPage() {
                     {blacklistList.length}
                   </span>
                 )}
-              </button>
-              <button
-                onClick={() => {
-                  setFormDevice({ nama: '', device: '', token: '', userId: '', isDefault: devicesList.length === 0, accountToken: '' })
-                  setModalAddDevice(true)
-                }}
-                className="flex-1 sm:flex-none px-4 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
-              >
-                <Plus size={15} />
-                <span>Tambah WhatsApp Baru</span>
               </button>
             </div>
           </div>
@@ -967,23 +960,14 @@ export default function KontakWaPage() {
               <div className="text-xs text-muted-foreground">Memuat data perangkat WhatsApp...</div>
             </div>
           ) : activeDevices.length === 0 ? (
-            <div className="text-center py-16 bg-card border border-dashed border-border rounded-2xl p-6">
+            <div className="text-center py-12 bg-card border border-dashed border-border rounded-2xl p-6">
               <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400 mx-auto mb-3">
                 <Smartphone size={24} />
               </div>
               <h3 className="text-sm font-bold text-foreground">Tidak Ada Akun WhatsApp Pengirim yang Aktif</h3>
-              <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-4">
-                Hanya akun WhatsApp yang sedang aktif dan terhubung yang ditampilkan di sini. Ketika Surveyor atau Admin menautkan WhatsApp, akun aktif akan otomatis muncul.
+              <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
+                Hanya akun WhatsApp yang sedang aktif dan terhubung yang ditampilkan di sini. Ketika Surveyor mengajukan nomor dan Anda menyetujuinya, surveyor dapat menghubungkan WhatsApp dan akun aktif akan otomatis muncul.
               </p>
-              <button
-                onClick={() => {
-                  setFormDevice({ nama: '', device: '', token: '', userId: '', isDefault: devicesList.length === 0, accountToken: '' })
-                  setModalAddDevice(true)
-                }}
-                className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-              >
-                <Plus size={14} /> Tambah WhatsApp Baru
-              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -711,7 +711,7 @@ exports.getPengajuanAktivasi = async (req, res) => {
     const list = await prisma.deviceWa.findMany({
       where: { statusAktivasi: 'MENUNGGU_AKTIVASI' },
       include: {
-        user: { select: { id: true, nama: true, username: true, role: true, email: true, kontakWa: true } }
+        user: { select: { id: true, nama: true, username: true, role: true, kontakWa: true } }
       },
       orderBy: { updatedAt: 'desc' }
     });
