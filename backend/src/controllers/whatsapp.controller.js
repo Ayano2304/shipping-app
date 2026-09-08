@@ -2,6 +2,7 @@ const prisma = require('../lib/prisma');
 const { generatePengirimanPDFBuffer } = require('../utils/pdfGenerator');
 const { generatePdfToken, generateReportSlug } = require('./export.controller');
 const { getFonnteAccountToken } = require('./settings.controller');
+const { notifyAdmins, notifyUser } = require('./notifikasi.controller');
 
 const toKg = (nilai, satuan) => satuan === 'MT' ? parseFloat(nilai) * 1000 : parseFloat(nilai);
 
@@ -702,6 +703,112 @@ exports.testDevice = async (req, res) => {
   }
 };
 
+// ─── PENGURUSAN PERSETUJUAN AKTIVASI PERANGKAT WA (ADMIN) ───
+
+// Ambil Semua Pengajuan Aktivasi WhatsApp yang Menunggu Persetujuan Admin
+exports.getPengajuanAktivasi = async (req, res) => {
+  try {
+    const list = await prisma.deviceWa.findMany({
+      where: { statusAktivasi: 'MENUNGGU_AKTIVASI' },
+      include: {
+        user: { select: { id: true, nama: true, username: true, role: true, email: true, kontakWa: true } }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+    res.json(list);
+  } catch (err) {
+    console.error('getPengajuanAktivasi error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Admin Menyetujui Pengajuan Aktivasi WhatsApp (Setelah Membeli / Meng-upgrade Paket di Fonnte)
+exports.approvePengajuanAktivasi = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const device = await prisma.deviceWa.findUnique({
+      where: { id: parseInt(id) },
+      include: { user: true }
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Data pengajuan perangkat tidak ditemukan.' });
+    }
+
+    const updated = await prisma.deviceWa.update({
+      where: { id: device.id },
+      data: {
+        statusAktivasi: 'DISETUJUI',
+        catatanAdmin: req.body?.catatan || 'Paket perangkat Fonnte telah aktif dan disetujui Administrator.'
+      },
+      include: { user: { select: { id: true, nama: true, username: true } } }
+    });
+
+    // Beritahu Surveyor bahwa WhatsApp siap dihubungkan
+    if (device.userId) {
+      await notifyUser(device.userId, {
+        judul: 'WhatsApp Anda Siap Dihubungkan! 🎉',
+        pesan: `Administrator telah mengaktifkan paket Fonnte untuk nomor WhatsApp Anda (+${device.nomorWa || '-'}). Silakan buka menu WhatsApp Saya untuk memasukkan kode pairing atau scan barcode QR.`,
+        tipe: 'WA_ACTIVATION_APPROVED'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Pengajuan untuk ${device.nama} (+${device.nomorWa}) berhasil disetujui. Surveyor telah diberitahu via notifikasi!`,
+      device: updated
+    });
+  } catch (err) {
+    console.error('approvePengajuanAktivasi error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Admin Menolak Pengajuan Aktivasi WhatsApp
+exports.rejectPengajuanAktivasi = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { alasan } = req.body;
+    const device = await prisma.deviceWa.findUnique({
+      where: { id: parseInt(id) },
+      include: { user: true }
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Data pengajuan perangkat tidak ditemukan.' });
+    }
+
+    const catatan = alasan && alasan.trim() ? alasan.trim() : 'Pengajuan ditolak oleh Administrator.';
+
+    const updated = await prisma.deviceWa.update({
+      where: { id: device.id },
+      data: {
+        statusAktivasi: 'DITOLAK',
+        catatanAdmin: catatan
+      },
+      include: { user: { select: { id: true, nama: true, username: true } } }
+    });
+
+    // Beritahu Surveyor
+    if (device.userId) {
+      await notifyUser(device.userId, {
+        judul: 'Pengajuan Aktivasi WhatsApp Ditolak ⚠️',
+        pesan: `Pengajuan aktivasi nomor WhatsApp Anda (+${device.nomorWa || '-'}) ditolak oleh Administrator. Alasan: ${catatan}`,
+        tipe: 'WA_ACTIVATION_REJECTED'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Pengajuan untuk ${device.nama} telah ditolak.`,
+      device: updated
+    });
+  } catch (err) {
+    console.error('rejectPengajuanAktivasi error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ─── USER SELF-SERVICE DEVICE (SURVEYOR / PETUGAS / ADMIN) ───
 
 // A. Ambil Device Pengirim Milik User Sendiri
@@ -713,8 +820,8 @@ exports.getMyDevice = async (req, res) => {
       include: { user: { select: { id: true, nama: true, username: true } } }
     });
 
-    // Selalu verifikasi status terkini dengan Fonnte agar tidak ada status palsu
-    if (device && device.token) {
+    // Selalu verifikasi status terkini dengan Fonnte hanya jika device sudah disetujui
+    if (device && device.token && device.statusAktivasi === 'DISETUJUI') {
       try {
         const checkRes = await fetch('https://api.fonnte.com/device', {
           method: 'POST',
@@ -747,6 +854,136 @@ exports.getMyDevice = async (req, res) => {
   }
 };
 
+// A.1 Ajukan Sinkronisasi WhatsApp oleh Surveyor (Menunggu Aktivasi Paket Fonnte oleh Admin)
+exports.ajukanSinkronisasiWA = async (req, res) => {
+  try {
+    const user = req.user;
+    const { nomorWa: inputNomorWa } = req.body;
+
+    if (!inputNomorWa || !inputNomorWa.trim()) {
+      return res.status(400).json({ error: 'Nomor WhatsApp wajib diisi.' });
+    }
+
+    let rawPhone = inputNomorWa.trim().replace(/[^0-9]/g, '');
+    if (rawPhone.startsWith('08')) rawPhone = '628' + rawPhone.slice(2);
+    else if (rawPhone.startsWith('8')) rawPhone = '628' + rawPhone.slice(1);
+
+    if (rawPhone.length < 9) {
+      return res.status(400).json({ error: 'Nomor WhatsApp tidak valid. Minimal 9 digit angka.' });
+    }
+
+    // 1. Cek daftar Blacklist
+    const isBlocked = await prisma.blacklistWa.findFirst({
+      where: { nomorWa: rawPhone }
+    });
+    if (isBlocked) {
+      return res.status(403).json({
+        error: `Nomor WhatsApp (+${rawPhone}) masuk dalam daftar blokir (Blacklist) Administrator. Alasan: ${isBlocked.alasan || 'Pelanggaran kebijakan'}. Silakan hubungi Administrator.`,
+        code: 'NUMBER_BLACKLISTED'
+      });
+    }
+
+    // 2. Update kontakWa di profil User
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { kontakWa: rawPhone }
+    });
+
+    // 3. Ambil Fonnte Account Token
+    const accountToken = await getFonnteAccountToken();
+    if (!accountToken) {
+      return res.status(400).json({
+        error: 'Fonnte Account Token belum diatur di Pengaturan Sistem oleh Administrator. Silakan hubungi Administrator.'
+      });
+    }
+
+    const deviceName = `WA - ${user.nama || user.username}`.substring(0, 30);
+    let device = await prisma.deviceWa.findFirst({ where: { userId: user.id } });
+
+    // Hapus device lama di Fonnte jika token sudah ada sebelumnya
+    if (device && device.token) {
+      try {
+        await fetch('https://api.fonnte.com/delete-device', {
+          method: 'POST',
+          headers: { 'Authorization': accountToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: device.token })
+        });
+      } catch (e) {
+        console.warn('Gagal hapus device lama di Fonnte:', e.message);
+      }
+    }
+
+    // 4. Daftarkan device baru ke Fonnte via /add-device
+    const createRes = await fetch('https://api.fonnte.com/add-device', {
+      method: 'POST',
+      headers: {
+        'Authorization': accountToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: deviceName,
+        device: rawPhone
+      })
+    });
+    const createData = await createRes.json();
+
+    if (!createData.status || !createData.token) {
+      return res.status(400).json({
+        error: `Gagal mendaftarkan nomor ${rawPhone} ke Fonnte: ${createData.reason || 'Periksa kuota slot perangkat di akun Fonnte Anda.'}`,
+        raw: createData
+      });
+    }
+
+    // 5. Simpan / perbarui deviceWa di DB dengan status MENUNGGU_AKTIVASI
+    if (device) {
+      device = await prisma.deviceWa.update({
+        where: { id: device.id },
+        data: {
+          nama: deviceName,
+          token: createData.token,
+          nomorWa: createData.device || rawPhone,
+          status: 'disconnected',
+          statusAktivasi: 'MENUNGGU_AKTIVASI',
+          catatanAdmin: null,
+          izinKirim: true
+        },
+        include: { user: { select: { id: true, nama: true, username: true } } }
+      });
+    } else {
+      device = await prisma.deviceWa.create({
+        data: {
+          nama: deviceName,
+          token: createData.token,
+          nomorWa: createData.device || rawPhone,
+          status: 'disconnected',
+          statusAktivasi: 'MENUNGGU_AKTIVASI',
+          catatanAdmin: null,
+          izinKirim: true,
+          isDefault: false,
+          userId: user.id
+        },
+        include: { user: { select: { id: true, nama: true, username: true } } }
+      });
+    }
+
+    // 6. Kirim notifikasi sistem ke Admin
+    await notifyAdmins({
+      judul: `Pengajuan Aktivasi WhatsApp: ${user.nama || user.username}`,
+      pesan: `Surveyor ${user.nama || user.username} telah mengajukan nomor WhatsApp (+${rawPhone}). Perangkat "${deviceName}" telah didaftarkan di Fonnte. Silakan beli/upgrade paket di dashboard fonnte.com lalu setujui pengajuan.`,
+      tipe: 'WA_ACTIVATION_REQUEST'
+    });
+
+    res.json({
+      success: true,
+      message: 'Pengajuan aktivasi WhatsApp berhasil disimpan dan diteruskan ke Administrator!',
+      device
+    });
+  } catch (err) {
+    console.error('ajukanSinkronisasiWA error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // B. Minta QR Code Milik User Sendiri (Otomatis Buat / Pulihkan Device via Account Token)
 exports.requestMyDeviceQr = async (req, res) => {
   try {
@@ -766,6 +1003,28 @@ exports.requestMyDeviceQr = async (req, res) => {
       if (raw.startsWith('08')) raw = '628' + raw.slice(2);
       else if (raw.startsWith('8')) raw = '628' + raw.slice(1);
       formattedPhone = raw;
+    }
+
+    // Guard: Pastikan device sudah diajukan dan disetujui Admin
+    if (!device) {
+      return res.status(400).json({
+        error: 'Nomor WhatsApp belum diajukan. Silakan masukkan nomor Anda dan klik "Simpan & Ajukan Sinkronisasi WhatsApp" terlebih dahulu.',
+        code: 'NEED_SUBMISSION'
+      });
+    }
+
+    if (device.statusAktivasi === 'MENUNGGU_AKTIVASI') {
+      return res.status(400).json({
+        error: 'Pengajuan aktivasi WhatsApp Anda sedang menunggu aktivasi paket oleh Administrator. Mohon tunggu hingga Administrator menyetujui.',
+        code: 'WAITING_ADMIN_APPROVAL'
+      });
+    }
+
+    if (device.statusAktivasi === 'DITOLAK') {
+      return res.status(400).json({
+        error: `Pengajuan aktivasi WhatsApp Anda ditolak oleh Administrator. Alasan: ${device.catatanAdmin || '-'}. Silakan ajukan ulang nomor Anda.`,
+        code: 'ACTIVATION_REJECTED'
+      });
     }
 
     // Cek apakah nomor masuk dalam daftar blacklist

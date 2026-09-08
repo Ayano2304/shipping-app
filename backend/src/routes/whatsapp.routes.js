@@ -14,11 +14,17 @@ const waLimiter = rateLimit({
 
 // User Self-Service Device (Hanya Role: ADMIN, SURVEYOR)
 router.get('/my-device', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.getMyDevice);
+router.post('/my-device/ajukan', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.ajukanSinkronisasiWA);
 router.post('/my-device/qr', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.requestMyDeviceQr);
 router.post('/my-device/status', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.checkMyDeviceStatus);
 router.post('/my-device/disconnect', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.disconnectMyDevice);
 router.post('/my-device/token', auth, roleGuard('ADMIN', 'SURVEYOR'), whatsappController.saveMyDeviceToken);
 router.post('/my-device/test', auth, roleGuard('ADMIN', 'SURVEYOR'), waLimiter, whatsappController.testMyDevice);
+
+// Persetujuan Aktivasi WhatsApp (Khusus ADMIN)
+router.get('/pengajuan-aktivasi', auth, roleGuard('ADMIN'), whatsappController.getPengajuanAktivasi);
+router.post('/pengajuan-aktivasi/:id/approve', auth, roleGuard('ADMIN'), whatsappController.approvePengajuanAktivasi);
+router.post('/pengajuan-aktivasi/:id/reject', auth, roleGuard('ADMIN'), whatsappController.rejectPengajuanAktivasi);
 
 // Device Management (Multi-Device Fonnte Admin)
 router.get('/devices', auth, roleGuard('ADMIN', 'PETUGAS', 'SURVEYOR'), whatsappController.getDevices);

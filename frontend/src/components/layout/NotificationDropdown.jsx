@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Bell, Ship, CheckCircle2, FilePlus, Info, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bell, Ship, CheckCircle2, FilePlus, Info, Loader2, Smartphone } from 'lucide-react'
 import { getNotifikasi, markAllNotifikasiRead } from '../../lib/api'
 import toast from 'react-hot-toast'
 
@@ -22,6 +23,7 @@ const formatWaktuLalu = (dateString) => {
 }
 
 export default function NotificationDropdown() {
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [notifikasiList, setNotifikasiList] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -48,12 +50,29 @@ export default function NotificationDropdown() {
           // Tampilkan live toast notification murni informatif
           toast(
             () => (
-              <div className="flex items-start gap-2.5 py-1">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+              <div 
+                className={`flex items-start gap-2.5 py-1 ${newest.tipe?.startsWith('WA_ACTIVATION') ? 'cursor-pointer' : ''}`}
+                onClick={() => {
+                  if (newest.tipe?.startsWith('WA_ACTIVATION')) {
+                    navigate('/kontak-wa')
+                  }
+                }}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                  newest.tipe === 'WA_ACTIVATION_REQUEST' 
+                    ? 'bg-amber-500/15 text-amber-500' 
+                    : newest.tipe === 'WA_ACTIVATION_APPROVED'
+                    ? 'bg-emerald-500/15 text-emerald-500'
+                    : newest.tipe === 'WA_ACTIVATION_REJECTED'
+                    ? 'bg-rose-500/15 text-rose-500'
+                    : 'bg-blue-500/15 text-blue-500'
+                }`}>
                   {newest.tipe === 'KAPAL_BERANGKAT' ? (
                     <Ship size={17} />
                   ) : newest.tipe === 'KAPAL_TIBA' ? (
                     <CheckCircle2 size={17} />
+                  ) : newest.tipe?.startsWith('WA_ACTIVATION') ? (
+                    <Smartphone size={17} />
                   ) : (
                     <FilePlus size={17} />
                   )}
@@ -156,6 +175,24 @@ export default function NotificationDropdown() {
             <FilePlus size={16} />
           </div>
         )
+      case 'WA_ACTIVATION_REQUEST':
+        return (
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 shadow-xs">
+            <Smartphone size={16} />
+          </div>
+        )
+      case 'WA_ACTIVATION_APPROVED':
+        return (
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 shadow-xs">
+            <Smartphone size={16} />
+          </div>
+        )
+      case 'WA_ACTIVATION_REJECTED':
+        return (
+          <div className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0 shadow-xs">
+            <Smartphone size={16} />
+          </div>
+        )
       default:
         return (
           <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0 shadow-xs">
@@ -232,31 +269,47 @@ export default function NotificationDropdown() {
                 </p>
               </div>
             ) : (
-              notifikasiList.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3.5 flex items-start gap-3 transition-colors bg-card hover:bg-secondary/30"
-                >
-                  {/* Icon */}
-                  {getNotifIcon(item.tipe)}
+              notifikasiList.map((item) => {
+                const isWaNotif = item.tipe?.startsWith('WA_ACTIVATION')
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      if (isWaNotif) {
+                        navigate('/kontak-wa')
+                        setIsOpen(false)
+                      }
+                    }}
+                    className={`p-3.5 flex items-start gap-3 transition-colors bg-card hover:bg-secondary/30 ${
+                      isWaNotif ? 'cursor-pointer hover:bg-secondary/60' : ''
+                    }`}
+                  >
+                    {/* Icon */}
+                    {getNotifIcon(item.tipe)}
 
-                  {/* Content (Title, message, time) */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="text-xs font-semibold text-foreground truncate">
-                        {item.judul}
-                      </h4>
-                      <span className="text-[10px] text-muted-foreground shrink-0 font-medium">
-                        {formatWaktuLalu(item.createdAt)}
-                      </span>
+                    {/* Content (Title, message, time) */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <h4 className="text-xs font-semibold text-foreground truncate">
+                          {item.judul}
+                        </h4>
+                        <span className="text-[10px] text-muted-foreground shrink-0 font-medium">
+                          {formatWaktuLalu(item.createdAt)}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        {item.pesan}
+                      </p>
+                      {isWaNotif && (
+                        <div className="mt-1 text-[10px] font-semibold text-primary flex items-center gap-1">
+                          Klik untuk buka Pusat WhatsApp &rarr;
+                        </div>
+                      )}
                     </div>
-
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                      {item.pesan}
-                    </p>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>

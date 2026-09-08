@@ -89,11 +89,17 @@ export const deleteBlacklistWA = (id) => api.delete(`/whatsapp/blacklist/${id}`)
 
 // User Self-Service Device WhatsApp
 export const getMyDeviceWA = () => api.get('/whatsapp/my-device')
+export const ajukanSinkronisasiWA = (data) => api.post('/whatsapp/my-device/ajukan', data)
 export const requestMyDeviceWAQr = (data) => api.post('/whatsapp/my-device/qr', data)
 export const checkMyDeviceWAStatus = () => api.post('/whatsapp/my-device/status')
 export const disconnectMyDeviceWA = () => api.post('/whatsapp/my-device/disconnect')
 export const saveMyDeviceWAToken = (data) => api.post('/whatsapp/my-device/token', data)
 export const testMyDeviceWA = (data) => api.post('/whatsapp/my-device/test', data)
+
+// Persetujuan Aktivasi WhatsApp (Khusus Admin)
+export const getPengajuanAktivasiWA = () => api.get('/whatsapp/pengajuan-aktivasi')
+export const approvePengajuanAktivasiWA = (id, data = {}) => api.post(`/whatsapp/pengajuan-aktivasi/${id}/approve`, data)
+export const rejectPengajuanAktivasiWA = (id, data = {}) => api.post(`/whatsapp/pengajuan-aktivasi/${id}/reject`, data)
 
 // Fonnte System Settings (Admin)
 export const getFonnteSetting = () => api.get('/settings/fonnte')

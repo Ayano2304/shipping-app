@@ -114,8 +114,49 @@ const deleteNotifikasi = async (req, res) => {
   }
 };
 
+// Helper: Kirim notifikasi ke semua user dengan role ADMIN
+const notifyAdmins = async ({ judul, pesan, tipe = 'WA_ACTIVATION_REQUEST', pengirimanId = null }) => {
+  try {
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { id: true }
+    });
+    for (const a of admins) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO notifikasi (user_id, judul, pesan, tipe, pengiriman_id, is_read, created_at) VALUES ($1, $2, $3, $4, $5, FALSE, NOW())`,
+        a.id,
+        judul,
+        pesan,
+        tipe,
+        pengirimanId ? parseInt(pengirimanId) : null
+      );
+    }
+  } catch (err) {
+    console.error('Error notifyAdmins:', err);
+  }
+};
+
+// Helper: Kirim notifikasi ke user spesifik (misal surveyor)
+const notifyUser = async (userId, { judul, pesan, tipe = 'WA_ACTIVATION_APPROVED', pengirimanId = null }) => {
+  try {
+    if (!userId) return;
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO notifikasi (user_id, judul, pesan, tipe, pengiriman_id, is_read, created_at) VALUES ($1, $2, $3, $4, $5, FALSE, NOW())`,
+      parseInt(userId),
+      judul,
+      pesan,
+      tipe,
+      pengirimanId ? parseInt(pengirimanId) : null
+    );
+  } catch (err) {
+    console.error('Error notifyUser:', err);
+  }
+};
+
 module.exports = {
   createNotification,
+  notifyAdmins,
+  notifyUser,
   getNotifikasi,
   markAsRead,
   markAllAsRead,
