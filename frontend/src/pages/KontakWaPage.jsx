@@ -394,6 +394,9 @@ export default function KontakWaPage() {
   }
 
   useEffect(() => {
+    setMyDevice(null)
+    setInputPhone(user?.kontakWa || '')
+    setShowEditPhone(false)
     if (isAdmin) {
       loadDevices()
       loadBlacklist()
@@ -404,7 +407,7 @@ export default function KontakWaPage() {
     }
     loadKontak()
     loadTemplates()
-  }, [isAdmin])
+  }, [isAdmin, user?.id])
 
   useEffect(() => {
     loadKontak()
@@ -2269,6 +2272,13 @@ export default function KontakWaPage() {
                     className="px-3 py-2 text-xs text-muted-foreground hover:text-foreground underline transition-colors cursor-pointer"
                   >
                     Ajukan Nomor Baru
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisconnectMyDevice}
+                    className="px-3 py-2 text-xs text-rose-600 hover:text-rose-700 dark:text-rose-400 underline transition-colors cursor-pointer"
+                  >
+                    Batalkan Pengajuan
                   </button>
                 </div>
               </div>
