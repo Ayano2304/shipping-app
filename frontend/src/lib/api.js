@@ -127,6 +127,9 @@ export const importExcel = (formData) => api.post('/masterdata/import-excel', fo
 export const importSoundingFromExcel = (formData) => api.post('/masterdata/import-sounding', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 })
+export const downloadKalibrasiTemplate = () => api.get('/masterdata/template-excel', {
+  responseType: 'blob'
+})
 
 // Notifikasi
 export const getNotifikasi = () => api.get('/notifikasi')

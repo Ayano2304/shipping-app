@@ -21,6 +21,7 @@ const upload = multer({
 router.get('/sounding', auth, masterdataController.getSoundingTable);
 router.get('/density', auth, masterdataController.getDensityTable);
 router.get('/faktor-koreksi', auth, masterdataController.getFaktorKoreksiTable);
+router.get('/template-excel', auth, masterdataController.downloadTemplateExcel);
 
 // Import Excel
 router.post('/import-excel', auth, roleGuard('ADMIN'), upload.single('file'), masterdataController.importExcel);

@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
-import { Plus, Trash2, Loader2, Sparkles, Layers } from 'lucide-react'
+import { Plus, Trash2, Loader2, Sparkles, Layers, AlertCircle } from 'lucide-react'
 import { hitungBeratPalka, formatAngka } from '../../lib/calc'
 import { cn } from '../../lib/utils'
-import { lookupVolume, lookupDensity } from '../../lib/api'
+import { lookupVolume, lookupDensity, getTinggiRange } from '../../lib/api'
 import toast from 'react-hot-toast'
 
 const defaultRow = (urutan) => ({
@@ -19,11 +19,33 @@ const defaultRow = (urutan) => ({
 export default function PalkaTableInput({ value = [], onChange, label, tipe, kapalId }) {
   const [lookupLoading, setLookupLoading] = useState({})
   const [justAddedId, setJustAddedId] = useState(null)
+  const [calRange, setCalRange] = useState({ min: null, max: null, minSuhu: null, maxSuhu: null, count: 0 })
   const debounceTimers = useRef({})
 
   useEffect(() => {
     if (value.length === 0) onChange([defaultRow(1)])
   }, [])
+
+  useEffect(() => {
+    if (!kapalId) {
+      setCalRange({ min: null, max: null, minSuhu: null, maxSuhu: null, count: 0 })
+      return
+    }
+    getTinggiRange({ kapalId })
+      .then(res => {
+        if (res.data) {
+          setCalRange({
+            min: res.data.min,
+            max: res.data.max,
+            minSuhu: res.data.minSuhu,
+            maxSuhu: res.data.maxSuhu,
+            count: res.data.count,
+            densityCount: res.data.densityCount
+          })
+        }
+      })
+      .catch(err => console.error('Error fetching ship calibration range:', err))
+  }, [kapalId])
 
   useEffect(() => {
     return () => {
@@ -130,11 +152,20 @@ export default function PalkaTableInput({ value = [], onChange, label, tipe, kap
       {/* Header bar with Clean Compact Button */}
       <div className="flex items-center justify-between gap-3 bg-secondary/30 px-4 py-3 rounded-2xl border border-border/80">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm sm:text-base font-bold text-foreground truncate">{label}</h3>
             <span className="text-[11px] font-mono font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
               {value.length} Palka
             </span>
+            {calRange.min && calRange.max ? (
+              <span className="text-[10px] font-mono text-muted-foreground bg-secondary/80 border border-border/70 px-2 py-0.5 rounded-md hidden sm:inline">
+                Kalibrasi: {calRange.min}–{calRange.max} cm ({calRange.minSuhu}–{calRange.maxSuhu}°C)
+              </span>
+            ) : kapalId && calRange.count === 0 ? (
+              <span className="text-[10px] font-medium text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
+                Kapal belum dikalibrasi
+              </span>
+            ) : null}
           </div>
           <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 truncate">
             {tipe === 'KEBERANGKATAN' ? 'SFAL (Sounding Muatan Asal)' : 'SFBD (Sounding Muatan Bongkar)'}
@@ -160,6 +191,16 @@ export default function PalkaTableInput({ value = [], onChange, label, tipe, kap
           const isNewlyAdded = row._id === justAddedId
           const berat = hitungBeratPalka(row.volumeLiter, row.point, row.density, row.faktorKoreksi, row.volumeBase, row.bedaLiter)
           const hasData = row.tinggiCm && row.suhu && row.volumeLiter && row.density
+
+          const tinggiPlaceholder = calRange.min && calRange.max
+            ? `${calRange.min} - ${calRange.max}`
+            : 'Tinggi cm'
+          const suhuPlaceholder = calRange.minSuhu && calRange.maxSuhu
+            ? `${calRange.minSuhu} - ${calRange.maxSuhu}`
+            : 'Suhu °C'
+
+          const isTinggiOutOfRange = row.tinggiCm && calRange.min && calRange.max && (Number(row.tinggiCm) < calRange.min || Number(row.tinggiCm) > calRange.max)
+          const isSuhuOutOfRange = row.suhu && calRange.minSuhu && calRange.maxSuhu && (Number(row.suhu) < calRange.minSuhu || Number(row.suhu) > calRange.maxSuhu)
 
           return (
             <div
@@ -211,25 +252,40 @@ export default function PalkaTableInput({ value = [], onChange, label, tipe, kap
               {/* Input Fields Grid (2 Columns on Mobile & Desktop) */}
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-muted-foreground">
-                    Tinggi (cm) <span className="text-red-400">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-muted-foreground">
+                      Tinggi (cm) <span className="text-red-400">*</span>
+                    </label>
+                    {calRange.min && (
+                      <span className="text-[9px] font-mono text-muted-foreground/70 hidden xs:inline">
+                        {calRange.min}–{calRange.max} cm
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={row.tinggiCm}
                     onChange={(e) => handleInput(idx, 'tinggiCm', e.target.value)}
-                    placeholder="150 - 270"
-                    min="150"
-                    max="270"
+                    placeholder={tinggiPlaceholder}
                     disabled={isLoading}
-                    className={inputCls}
+                    className={cn(inputCls, isTinggiOutOfRange && 'border-amber-500/70 focus:border-amber-500 focus:ring-amber-500/20')}
                   />
+                  {isTinggiOutOfRange && (
+                    <p className="text-[10px] text-amber-500 font-medium leading-tight">
+                      Di luar kalibrasi ({calRange.min}–{calRange.max} cm)
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-muted-foreground">
-                    Point <span className="text-red-400">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-muted-foreground">
+                      Point <span className="text-red-400">*</span>
+                    </label>
+                    <span className="text-[9px] font-mono text-muted-foreground/70 hidden xs:inline">
+                      0.00–0.99
+                    </span>
+                  </div>
                   <input
                     type="number"
                     value={row.point}
@@ -242,19 +298,29 @@ export default function PalkaTableInput({ value = [], onChange, label, tipe, kap
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-muted-foreground">
-                    Suhu (°C) <span className="text-red-400">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-muted-foreground">
+                      Suhu (°C) <span className="text-red-400">*</span>
+                    </label>
+                    {calRange.minSuhu && (
+                      <span className="text-[9px] font-mono text-muted-foreground/70 hidden xs:inline">
+                        {calRange.minSuhu}–{calRange.maxSuhu}°C
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={row.suhu}
                     onChange={(e) => handleInput(idx, 'suhu', e.target.value)}
-                    placeholder="25 - 74"
-                    min="25"
-                    max="74"
+                    placeholder={suhuPlaceholder}
                     disabled={isLoading}
-                    className={inputCls}
+                    className={cn(inputCls, isSuhuOutOfRange && 'border-amber-500/70 focus:border-amber-500 focus:ring-amber-500/20')}
                   />
+                  {isSuhuOutOfRange && (
+                    <p className="text-[10px] text-amber-500 font-medium leading-tight">
+                      Di luar kalibrasi ({calRange.minSuhu}–{calRange.maxSuhu}°C)
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">

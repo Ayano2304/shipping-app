@@ -71,28 +71,47 @@ exports.lookupDensity = async (req, res) => {
   }
 };
 
-// GET /api/lookup/tinggi-range - range tinggi yang tersedia
+// GET /api/lookup/tinggi-range - range tinggi dan suhu yang tersedia per kapal
 exports.getTinggiRange = async (req, res) => {
   try {
     const { kapalId } = req.query;
-    const where = kapalId ? { kapalId: parseInt(kapalId) } : {};
+    const whereKapal = kapalId ? { kapalId: parseInt(kapalId) } : {};
     
-    const data = await prisma.soundingTable.findMany({
-      where,
-      select: { tinggiCm: true },
-      orderBy: { tinggiCm: 'asc' },
-      distinct: ['tinggiCm']
-    });
+    const [soundingData, densityData] = await Promise.all([
+      prisma.soundingTable.findMany({
+        where: whereKapal,
+        select: { tinggiCm: true },
+        orderBy: { tinggiCm: 'asc' },
+        distinct: ['tinggiCm']
+      }),
+      prisma.densityTable.findMany({
+        where: whereKapal,
+        select: { suhu: true },
+        orderBy: { suhu: 'asc' },
+        distinct: ['suhu']
+      })
+    ]);
     
-    if (data.length === 0) {
-      return res.status(404).json({ error: 'Data sounding tidak ditemukan' });
+    if (soundingData.length === 0 && densityData.length === 0) {
+      return res.json({
+        min: null,
+        max: null,
+        count: 0,
+        minSuhu: null,
+        maxSuhu: null,
+        densityCount: 0,
+        available: []
+      });
     }
 
     res.json({
-      min: data[0].tinggiCm,
-      max: data[data.length - 1].tinggiCm,
-      count: data.length,
-      available: data.map(d => d.tinggiCm)
+      min: soundingData.length > 0 ? soundingData[0].tinggiCm : null,
+      max: soundingData.length > 0 ? soundingData[soundingData.length - 1].tinggiCm : null,
+      count: soundingData.length,
+      minSuhu: densityData.length > 0 ? densityData[0].suhu : null,
+      maxSuhu: densityData.length > 0 ? densityData[densityData.length - 1].suhu : null,
+      densityCount: densityData.length,
+      available: soundingData.map(d => d.tinggiCm)
     });
   } catch (err) {
     console.error('Get tinggi range error:', err);

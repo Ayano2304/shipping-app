@@ -6,8 +6,47 @@ exports.getAll = async (req, res) => {
       orderBy: { namaKapal: 'asc' },
       include: { _count: { select: { pengiriman: true, soundingTable: true, densityTable: true } } }
     });
-    res.json(kapal);
+
+    // Ambil agregasi rentang sounding dan density per kapal
+    const [soundingRanges, densityRanges] = await Promise.all([
+      prisma.soundingTable.groupBy({
+        by: ['kapalId'],
+        _min: { tinggiCm: true },
+        _max: { tinggiCm: true },
+      }),
+      prisma.densityTable.groupBy({
+        by: ['kapalId'],
+        _min: { suhu: true },
+        _max: { suhu: true },
+      })
+    ]);
+
+    const soundingMap = new Map(soundingRanges.map(s => [s.kapalId, s]));
+    const densityMap = new Map(densityRanges.map(d => [d.kapalId, d]));
+
+    const result = kapal.map(k => {
+      const s = soundingMap.get(k.id);
+      const d = densityMap.get(k.id);
+      const soundingCount = k._count?.soundingTable || 0;
+      const densityCount = k._count?.densityTable || 0;
+
+      return {
+        ...k,
+        kalibrasi: {
+          isCalibrated: soundingCount > 0 && densityCount > 0,
+          soundingCount,
+          minTinggi: s?._min?.tinggiCm ?? null,
+          maxTinggi: s?._max?.tinggiCm ?? null,
+          densityCount,
+          minSuhu: d?._min?.suhu ?? null,
+          maxSuhu: d?._max?.suhu ?? null,
+        }
+      };
+    });
+
+    res.json(result);
   } catch (err) {
+    console.error('Error getAll kapal:', err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Upload, Database, Loader2, Ship } from 'lucide-react'
+import { Upload, Database, Loader2, Ship, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getSoundingTable, getDensityTable, getFaktorKoreksiTable, importExcel, getKapal } from '../lib/api'
+import { getSoundingTable, getDensityTable, getFaktorKoreksiTable, importExcel, getKapal, downloadKalibrasiTemplate } from '../lib/api'
 import CustomSelect from '../components/ui/CustomSelect'
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
@@ -14,6 +14,7 @@ export default function MasterDataPage() {
   const [faktorKoreksiData, setFaktorKoreksiData] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
   const [kapalList, setKapalList] = useState([])
   const [selectedKapalId, setSelectedKapalId] = useState('')
@@ -48,22 +49,49 @@ export default function MasterDataPage() {
     }
   }
 
+  const handleDownloadTemplate = async () => {
+    setDownloadingTemplate(true)
+    try {
+      const res = await downloadKalibrasiTemplate()
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'Template_Kalibrasi_Kapal.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success('Template Excel berhasil diunduh!')
+    } catch (err) {
+      toast.error('Gagal mengunduh template Excel.')
+    } finally {
+      setDownloadingTemplate(false)
+    }
+  }
+
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    if (!selectedKapalId) {
+      toast.error('Silakan pilih kapal terlebih dahulu di dropdown sebelum mengimpor file Excel.')
+      e.target.value = ''
+      return
+    }
 
     setUploading(true)
 
     try {
       const formData = new FormData()
       formData.append('file', file)
-      if (selectedKapalId) {
-        formData.append('kapalId', selectedKapalId)
-      }
+      formData.append('kapalId', selectedKapalId)
 
       const res = await importExcel(formData)
-      const imported = res.data.imported
-      toast.success(`Import berhasil! ${JSON.stringify(imported)}`)
+      const targetKapal = kapalList.find(k => String(k.id) === String(selectedKapalId))
+      toast.success(res.data?.message || `Import berhasil untuk kapal ${targetKapal?.namaKapal || ''}!`)
       loadData()
     } catch (err) {
       toast.error(err.response?.data?.error || err.message || 'Gagal mengimpor file Excel.')
@@ -86,7 +114,7 @@ export default function MasterDataPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Master Data</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Kelola data sounding, density, dan faktor koreksi
+            Kelola data sounding, density, dan faktor koreksi per kapal
           </p>
         </div>
 
@@ -106,6 +134,16 @@ export default function MasterDataPage() {
               />
             </div>
           )}
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            disabled={downloadingTemplate}
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 border border-border bg-secondary/60 text-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
+            title="Download Template Excel Kalibrasi"
+          >
+            {downloadingTemplate ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            <span className="hidden sm:inline">Template Excel</span>
+          </button>
           <label className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-colors w-full sm:w-auto shadow-xs active:scale-95 ${
             uploading
               ? 'bg-primary/50 text-primary-foreground cursor-not-allowed'
@@ -160,17 +198,21 @@ export default function MasterDataPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-secondary/50 border-b border-border">
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Nama Palka</th>
+                    {!selectedKapalId && (
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Kapal</th>
+                    )}
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Tinggi (cm)</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Volume (L)</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Beda (L)</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Beda (L/cm)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {soundingData.map((row) => (
                     <tr key={row.id} className="border-b border-border/50 hover:bg-secondary/20">
-                      <td className="px-4 py-2.5">{row.namaPalka}</td>
-                      <td className="px-4 py-2.5">{row.tinggiCm}</td>
+                      {!selectedKapalId && (
+                        <td className="px-4 py-2.5 font-medium text-foreground">{row.kapal?.namaKapal || '—'}</td>
+                      )}
+                      <td className="px-4 py-2.5 font-mono">{row.tinggiCm}</td>
                       <td className="px-4 py-2.5 text-right font-mono">{parseFloat(row.volumeLiter).toFixed(4)}</td>
                       <td className="px-4 py-2.5 text-right font-mono">
                         {row.bedaLiter ? parseFloat(row.bedaLiter).toFixed(4) : '—'}
@@ -182,7 +224,7 @@ export default function MasterDataPage() {
               {soundingData.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   <Database size={48} className="mx-auto mb-3 opacity-30" />
-                  <p>Belum ada data. Import Excel untuk memulai.</p>
+                  <p>Belum ada data sounding. Pilih kapal dan import file Excel untuk memulai.</p>
                 </div>
               )}
             </div>
@@ -194,6 +236,9 @@ export default function MasterDataPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-secondary/50 border-b border-border">
+                    {!selectedKapalId && (
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Kapal</th>
+                    )}
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Suhu (°C)</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Density</th>
                   </tr>
@@ -201,7 +246,10 @@ export default function MasterDataPage() {
                 <tbody>
                   {densityData.map((row) => (
                     <tr key={row.id} className="border-b border-border/50 hover:bg-secondary/20">
-                      <td className="px-4 py-2.5">{row.suhu}</td>
+                      {!selectedKapalId && (
+                        <td className="px-4 py-2.5 font-medium text-foreground">{row.kapal?.namaKapal || '—'}</td>
+                      )}
+                      <td className="px-4 py-2.5 font-mono">{row.suhu}</td>
                       <td className="px-4 py-2.5 text-right font-mono">{parseFloat(row.density).toFixed(4)}</td>
                     </tr>
                   ))}
@@ -210,7 +258,7 @@ export default function MasterDataPage() {
               {densityData.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   <Database size={48} className="mx-auto mb-3 opacity-30" />
-                  <p>Belum ada data. Import Excel untuk memulai.</p>
+                  <p>Belum ada data density. Pilih kapal dan import file Excel untuk memulai.</p>
                 </div>
               )}
             </div>

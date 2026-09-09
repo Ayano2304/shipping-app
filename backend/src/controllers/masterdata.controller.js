@@ -66,6 +66,70 @@ exports.getFaktorKoreksiTable = async (req, res) => {
 };
 
 
+// GET /api/masterdata/template-excel
+exports.downloadTemplateExcel = async (req, res) => {
+  try {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Sounding Table
+    const soundingHeaders = [['Tinggi (cm)', 'Volume (Liter)', 'Beda (Liter/cm)']];
+    const soundingSample = [
+      [150, 60450, 403],
+      [151, 60853, 403],
+      [152, 61256, 403],
+      [153, 61659, 403],
+      [154, 62062, 403],
+    ];
+    const wsSounding = XLSX.utils.aoa_to_sheet([...soundingHeaders, ...soundingSample]);
+    XLSX.utils.book_append_sheet(wb, wsSounding, 'Sounding');
+
+    // Sheet 2: Density Table
+    const densityHeaders = [['Temp', 'Density']];
+    const densitySample = [
+      [25, 0.9066],
+      [26, 0.9060],
+      [27, 0.9063],
+      [28, 0.9047],
+      [29, 0.9040],
+      [30, 0.9034],
+      [31, 0.9028],
+      [32, 0.9021],
+    ];
+    const wsDensity = XLSX.utils.aoa_to_sheet([...densityHeaders, ...densitySample]);
+    XLSX.utils.book_append_sheet(wb, wsDensity, 'Density');
+
+    // Sheet 3: Petunjuk Pengisian
+    const petunjuk = [
+      ['PETUNJUK PENGISIAN TEMPLATE KALIBRASI KAPAL'],
+      [''],
+      ['1. Sheet "Sounding":'],
+      ['   - Kolom A (Tinggi cm): Nilai tinggi sounding dalam sentimeter (angka bulat tanpa desimal, misal: 100, 101, dst).'],
+      ['   - Kolom B (Volume Liter): Kapasitas volume cairan pada tinggi tersebut dalam satuan Liter.'],
+      ['   - Kolom C (Beda Liter/cm - Opsional): Kenaikan volume per 1 cm tinggi. Jika dikosongkan, sistem akan menghitung selisih antar baris secara otomatis.'],
+      [''],
+      ['2. Sheet "Density":'],
+      ['   - Kolom A (Temp): Nilai suhu cairan dalam derajat Celcius (°C) (angka bulat, misal: 28, 29, dst).'],
+      ['   - Kolom B (Density): Nilai density minyak/cairan pada suhu tersebut (desimal hingga 4 angka di belakang koma, misal: 0.8628).'],
+      [''],
+      ['3. Catatan Penting:'],
+      ['   - Jangan mengubah nama sheet ("Sounding" dan "Density").'],
+      ['   - Baris pertama pada setiap sheet adalah judul kolom (header).'],
+      ['   - Pastikan data sounding diurutkan dari tinggi terendah ke tertinggi.'],
+    ];
+    const wsPetunjuk = XLSX.utils.aoa_to_sheet(petunjuk);
+    XLSX.utils.book_append_sheet(wb, wsPetunjuk, 'Petunjuk');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="Template_Kalibrasi_Kapal.xlsx"');
+    res.send(buffer);
+  } catch (err) {
+    console.error('Download template excel error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // POST /api/masterdata/import-excel
 exports.importExcel = async (req, res) => {
   try {
@@ -75,41 +139,60 @@ exports.importExcel = async (req, res) => {
     
     const { kapalId } = req.body;
     if (!kapalId) {
-      return res.status(400).json({ error: 'kapalId wajib diisi' });
+      return res.status(400).json({ error: 'kapalId wajib diisi. Silakan pilih kapal terlebih dahulu.' });
     }
 
     const kapalIdInt = parseInt(kapalId);
+    const kapal = await prisma.kapal.findUnique({ where: { id: kapalIdInt } });
+    if (!kapal) {
+      return res.status(404).json({ error: 'Kapal yang dipilih tidak ditemukan di sistem.' });
+    }
+
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     let imported = { sounding: 0, density: 0, faktorKoreksi: 0 };
 
-    // Import Density Table
-    if (workbook.SheetNames.includes('Density')) {
-      const sheet = workbook.Sheets['Density'];
+    // Cari sheet Density (case-insensitive)
+    const densitySheetName = workbook.SheetNames.find(s => s.toLowerCase().trim() === 'density');
+    if (densitySheetName) {
+      const sheet = workbook.Sheets[densitySheetName];
       const jsonData = XLSX.utils.sheet_to_json(sheet);
       
       if (jsonData.length > 0) {
         await prisma.densityTable.deleteMany({ where: { kapalId: kapalIdInt } });
         
-        const densityData = jsonData
-          .filter(row => row.Temp && row.Density)
-          .map(row => ({
-            kapalId: kapalIdInt,
-            suhu: parseInt(row.Temp),
-            density: parseFloat(row.Density)
-          }));
+        const densityData = [];
+        for (const row of jsonData) {
+          // Cari key temp & density secara fleksibel
+          const tempKey = Object.keys(row).find(k => /^(temp|suhu|temperature)$/i.test(k.trim()));
+          const densityKey = Object.keys(row).find(k => /^(density|kerapatan|densitas)$/i.test(k.trim()));
 
-        await prisma.densityTable.createMany({
-          data: densityData,
-          skipDuplicates: true
-        });
-        
-        imported.density = densityData.length;
+          if (tempKey && densityKey && row[tempKey] !== undefined && row[densityKey] !== undefined) {
+            const suhu = parseInt(row[tempKey]);
+            const density = parseFloat(row[densityKey]);
+            if (!isNaN(suhu) && !isNaN(density)) {
+              densityData.push({
+                kapalId: kapalIdInt,
+                suhu,
+                density
+              });
+            }
+          }
+        }
+
+        if (densityData.length > 0) {
+          await prisma.densityTable.createMany({
+            data: densityData,
+            skipDuplicates: true
+          });
+          imported.density = densityData.length;
+        }
       }
     }
 
-    // Import Faktor Koreksi Table
-    if (workbook.SheetNames.includes('Faktor Koreksi')) {
-      const sheet = workbook.Sheets['Faktor Koreksi'];
+    // Cari sheet Faktor Koreksi (jika ada)
+    const fkSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim().replace(/[\s_-]/g, '') === 'faktorkoreksi');
+    if (fkSheetName) {
+      const sheet = workbook.Sheets[fkSheetName];
       const jsonData = XLSX.utils.sheet_to_json(sheet);
       
       if (jsonData.length > 0) {
@@ -122,18 +205,20 @@ exports.importExcel = async (req, res) => {
             faktorKoreksi: parseFloat(row['Faktor Koreksi'])
           }));
 
-        await prisma.faktorKoreksiTable.createMany({
-          data: fkData,
-          skipDuplicates: true
-        });
-        
-        imported.faktorKoreksi = fkData.length;
+        if (fkData.length > 0) {
+          await prisma.faktorKoreksiTable.createMany({
+            data: fkData,
+            skipDuplicates: true
+          });
+          imported.faktorKoreksi = fkData.length;
+        }
       }
     }
 
-    // Import Sounding Table
-    if (workbook.SheetNames.includes('Sounding')) {
-      const sheet = workbook.Sheets['Sounding'];
+    // Cari sheet Sounding (case-insensitive)
+    const soundingSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim() === 'sounding');
+    if (soundingSheetName) {
+      const sheet = workbook.Sheets[soundingSheetName];
       const range = XLSX.utils.decode_range(sheet['!ref']);
       await prisma.soundingTable.deleteMany({ where: { kapalId: kapalIdInt } });
       
@@ -142,19 +227,27 @@ exports.importExcel = async (req, res) => {
       // Baca data per row
       for (let row = 1; row <= range.e.r; row++) {
         const tinggiCell = sheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
-        if (!tinggiCell || !tinggiCell.v) continue;
+        if (!tinggiCell || tinggiCell.v === undefined || tinggiCell.v === null || tinggiCell.v === '') continue;
         
         const tinggiCm = parseInt(tinggiCell.v);
         if (isNaN(tinggiCm)) continue;
 
         const volumeCell = sheet[XLSX.utils.encode_cell({ r: row, c: 1 })];
-        if (volumeCell && volumeCell.v) {
+        if (volumeCell && volumeCell.v !== undefined && volumeCell.v !== null && volumeCell.v !== '') {
           const volumeLiter = parseFloat(volumeCell.v);
+          if (isNaN(volumeLiter)) continue;
           
           let bedaLiter = null;
-          const nextVolumeCell = sheet[XLSX.utils.encode_cell({ r: row + 1, c: 1 })];
-          if (nextVolumeCell && nextVolumeCell.v) {
-            bedaLiter = parseFloat(nextVolumeCell.v) - volumeLiter;
+          // Cek apakah ada kolom beda (kolom C / index 2)
+          const bedaCell = sheet[XLSX.utils.encode_cell({ r: row, c: 2 })];
+          if (bedaCell && bedaCell.v !== undefined && bedaCell.v !== null && !isNaN(parseFloat(bedaCell.v))) {
+            bedaLiter = parseFloat(bedaCell.v);
+          } else {
+            // Hitung otomatis dari selisih baris berikutnya
+            const nextVolumeCell = sheet[XLSX.utils.encode_cell({ r: row + 1, c: 1 })];
+            if (nextVolumeCell && nextVolumeCell.v !== undefined && nextVolumeCell.v !== null && !isNaN(parseFloat(nextVolumeCell.v))) {
+              bedaLiter = parseFloat(nextVolumeCell.v) - volumeLiter;
+            }
           }
 
           soundingData.push({
@@ -163,6 +256,17 @@ exports.importExcel = async (req, res) => {
             volumeLiter,
             bedaLiter
           });
+        }
+      }
+
+      // Jika baris terakhir tidak memiliki bedaLiter, warisi dari baris sebelumnya
+      for (let i = 0; i < soundingData.length; i++) {
+        if (soundingData[i].bedaLiter === null || isNaN(soundingData[i].bedaLiter)) {
+          if (i > 0 && soundingData[i - 1].bedaLiter !== null) {
+            soundingData[i].bedaLiter = soundingData[i - 1].bedaLiter;
+          } else {
+            soundingData[i].bedaLiter = 0;
+          }
         }
       }
 
@@ -175,10 +279,20 @@ exports.importExcel = async (req, res) => {
       }
     }
 
+    const details = [];
+    if (imported.sounding > 0) details.push(`${imported.sounding} data sounding`);
+    if (imported.density > 0) details.push(`${imported.density} data density`);
+    if (imported.faktorKoreksi > 0) details.push(`${imported.faktorKoreksi} data faktor koreksi`);
+
+    const summaryText = details.length > 0 
+      ? details.join(', ') 
+      : 'Tidak ada data valid yang ditemukan pada sheet Sounding / Density';
+
     res.json({ 
-      message: 'Import berhasil', 
+      message: `Import kalibrasi untuk kapal "${kapal.namaKapal}" berhasil.`, 
       imported,
-      details: `Density: ${imported.density}, Faktor Koreksi: ${imported.faktorKoreksi}, Sounding: ${imported.sounding}`
+      kapal: { id: kapal.id, namaKapal: kapal.namaKapal },
+      details: summaryText
     });
   } catch (err) {
     console.error('Import Excel error:', err);
