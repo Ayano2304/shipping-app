@@ -18,7 +18,7 @@ import {
   X, AlertTriangle, QrCode, RefreshCw, Send, Smartphone, Star,
   UserCheck, Shield, Bookmark, Sparkles, Copy, Check, Lock, Hash,
   Ban, ShieldAlert, ShieldOff, Clock, Info, CheckCircle,
-  User, Bot, Key, MoreVertical, ChevronDown, ChevronRight, ShieldCheck
+  User, Bot, Key, MoreVertical, ChevronDown, ChevronRight, ShieldCheck, RotateCw
 } from 'lucide-react'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 
@@ -128,15 +128,16 @@ export default function KontakWaPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'ADMIN'
 
-  // Akses halaman hanya untuk ADMIN dan SURVEYOR
-  if (user && user.role !== 'ADMIN' && user.role !== 'SURVEYOR') {
-    return <Navigate to="/dashboard" replace />
-  }
-
   // Active Tab:
   // Admin: 'pengirim' | 'penerima' | 'template'
   // Non-Admin: 'penerima' | 'my-device' | 'template'
   const [activeTab, setActiveTab] = useState(isAdmin ? 'pengirim' : 'penerima')
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'penerima') {
+      setActiveTab('pengirim')
+    }
+  }, [isAdmin])
 
   // ─── TAB 1: KONTAK PENERIMA STATE ───
   const [kontakList, setKontakList] = useState([])
@@ -828,6 +829,11 @@ export default function KontakWaPage() {
   // Filter akun WhatsApp pengirim yang aktif saja
   const activeDevices = devicesList.filter(d => d.status === 'connected' || d.status === 'connect')
 
+  // Akses halaman hanya untuk ADMIN dan SURVEYOR
+  if (user && user.role !== 'ADMIN' && user.role !== 'SURVEYOR') {
+    return <Navigate to="/dashboard" replace />
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* 1. Header & Quick Info */}
@@ -1091,11 +1097,12 @@ export default function KontakWaPage() {
           ) : (
             <div className="space-y-6">
               {activeDevices.map((dev) => {
-                const phoneDisplay = dev.nomorWa
-                  ? (dev.nomorWa.startsWith('+') ? dev.nomorWa : `+${dev.nomorWa.replace(/\D/g, '')}`)
+                const rawPhone = dev.nomorWa ? String(dev.nomorWa) : ''
+                const phoneDisplay = rawPhone
+                  ? (rawPhone.startsWith('+') ? rawPhone : `+${rawPhone.replace(/\D/g, '')}`)
                   : '-'
                 const maskedToken = dev.token
-                  ? `${dev.token.slice(0, 8)} •••••••••`
+                  ? `${String(dev.token).slice(0, 8)} •••••••••`
                   : '••••••••••••••••'
 
                 return (
