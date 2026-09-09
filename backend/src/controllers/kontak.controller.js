@@ -103,13 +103,25 @@ exports.getById = async (req, res) => {
 // POST /api/kontak-wa
 exports.create = async (req, res) => {
   try {
-    const { nama, nomorWa, jabatan, instansi, catatan, aktif, isGlobal } = req.body;
+    const { nama, nomorWa, jabatan, instansi, catatan, aktif, isGlobal, userId } = req.body;
     if (!nama || !nomorWa) {
       return res.status(400).json({ error: 'Nama kontak dan nomor WhatsApp wajib diisi.' });
     }
 
     const formattedNomor = formatNomorWA(nomorWa);
     const isAdmin = req.user?.role === 'ADMIN';
+
+    let assignedUserId = req.user?.id || null;
+    let globalFlag = false;
+
+    if (isAdmin) {
+      if (isGlobal) {
+        globalFlag = true;
+        assignedUserId = req.user?.id || null;
+      } else if (userId) {
+        assignedUserId = parseInt(userId);
+      }
+    }
 
     const kontak = await prisma.kontakWa.create({
       data: {
@@ -119,9 +131,8 @@ exports.create = async (req, res) => {
         instansi: instansi ? instansi.trim() : null,
         catatan: catatan ? catatan.trim() : null,
         aktif: true, // Otomatis aktif saat penambahan kontak baru
-        // Hanya admin yang bisa membuat kontak kantor/global
-        isGlobal: isAdmin ? Boolean(isGlobal) : false,
-        userId: req.user?.id || null,
+        isGlobal: globalFlag,
+        userId: assignedUserId,
       },
       include: {
         user: { select: { id: true, nama: true, role: true } }
@@ -149,7 +160,7 @@ exports.update = async (req, res) => {
       return res.status(403).json({ error: 'Anda hanya dapat mengubah kontak milik Anda sendiri.' });
     }
 
-    const { nama, nomorWa, jabatan, instansi, catatan, aktif, isGlobal } = req.body;
+    const { nama, nomorWa, jabatan, instansi, catatan, aktif, isGlobal, userId } = req.body;
     const updateData = {};
 
     if (nama !== undefined) updateData.nama = nama.trim();
@@ -159,6 +170,7 @@ exports.update = async (req, res) => {
     if (catatan !== undefined) updateData.catatan = catatan ? catatan.trim() : null;
     if (aktif !== undefined) updateData.aktif = Boolean(aktif);
     if (isAdmin && isGlobal !== undefined) updateData.isGlobal = Boolean(isGlobal);
+    if (isAdmin && userId !== undefined) updateData.userId = userId ? parseInt(userId) : null;
 
     const kontak = await prisma.kontakWa.update({
       where: { id },

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
   getKontakWa, createKontakWa, updateKontakWa, deleteKontakWa,
@@ -18,7 +18,8 @@ import {
   X, AlertTriangle, QrCode, RefreshCw, Send, Smartphone, Star,
   UserCheck, Shield, Bookmark, Sparkles, Copy, Check, Lock, Hash,
   Ban, ShieldAlert, ShieldOff, Clock, Info, CheckCircle,
-  User, Bot, Key, MoreVertical, ChevronDown, ChevronRight, ShieldCheck, RotateCw
+  User, Bot, Key, MoreVertical, ChevronDown, ChevronRight, ShieldCheck, RotateCw,
+  ChevronUp, Filter
 } from 'lucide-react'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 
@@ -124,6 +125,87 @@ function RobotMascot() {
   )
 }
 
+function WhatsAppIcon({ className = "w-4 h-4 text-[#25D366]" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+    </svg>
+  )
+}
+
+const PRESET_USER_THEMES = {
+  elaine: {
+    avatar: 'bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300',
+    badge: 'bg-purple-50 text-purple-600 border border-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/40',
+    contactAvatar: 'bg-purple-100/80 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300',
+  },
+  ayano: {
+    avatar: 'bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300',
+    badge: 'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/40',
+    contactAvatar: 'bg-blue-100/80 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300',
+  },
+  sutrisna: {
+    avatar: 'bg-pink-100 text-pink-600 dark:bg-pink-950/60 dark:text-pink-300',
+    badge: 'bg-pink-50 text-pink-600 border border-pink-100 dark:bg-pink-950/40 dark:text-pink-300 dark:border-pink-800/40',
+    contactAvatar: 'bg-pink-100/80 text-pink-600 dark:bg-pink-950/40 dark:text-pink-300',
+  },
+  mizuha: {
+    avatar: 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300',
+    badge: 'bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40',
+    contactAvatar: 'bg-amber-100/80 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300',
+  },
+  administrator: {
+    avatar: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300',
+    badge: 'bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/40',
+    contactAvatar: 'bg-indigo-100/80 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300',
+  }
+}
+
+const FALLBACK_PALETTES = [
+  PRESET_USER_THEMES.elaine,
+  PRESET_USER_THEMES.ayano,
+  PRESET_USER_THEMES.sutrisna,
+  PRESET_USER_THEMES.mizuha,
+  PRESET_USER_THEMES.administrator,
+  {
+    avatar: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300',
+    badge: 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40',
+    contactAvatar: 'bg-emerald-100/80 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300',
+  },
+  {
+    avatar: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-300',
+    badge: 'bg-cyan-50 text-cyan-600 border border-cyan-100 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800/40',
+    contactAvatar: 'bg-cyan-100/80 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-300',
+  }
+]
+
+function getGroupTheme(name) {
+  if (!name) return FALLBACK_PALETTES[0]
+  const lower = name.toLowerCase().trim()
+  if (PRESET_USER_THEMES[lower]) return PRESET_USER_THEMES[lower]
+  let hash = 0
+  for (let i = 0; i < lower.length; i++) {
+    hash = (hash * 31 + lower.charCodeAt(i)) % FALLBACK_PALETTES.length
+  }
+  return FALLBACK_PALETTES[Math.abs(hash)]
+}
+
+function formatTerakhirDiperbarui(dateString) {
+  if (!dateString) return '-'
+  try {
+    const d = new Date(dateString)
+    if (isNaN(d.getTime())) return '-'
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    const hours = String(d.getHours()).padStart(2, '0')
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    return `${day}/${month}/${year} ${hours}:${minutes}`
+  } catch {
+    return '-'
+  }
+}
+
 export default function KontakWaPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'ADMIN'
@@ -132,12 +214,6 @@ export default function KontakWaPage() {
   // Admin: 'pengirim' | 'penerima' | 'template'
   // Non-Admin: 'penerima' | 'my-device' | 'template'
   const [activeTab, setActiveTab] = useState(isAdmin ? 'pengirim' : 'penerima')
-
-  useEffect(() => {
-    if (isAdmin && activeTab === 'penerima') {
-      setActiveTab('pengirim')
-    }
-  }, [isAdmin])
 
   // ─── TAB 1: KONTAK PENERIMA STATE ───
   const [kontakList, setKontakList] = useState([])
@@ -149,8 +225,11 @@ export default function KontakWaPage() {
   const [confirmDeleteKontak, setConfirmDeleteKontak] = useState(null)
   const [submittingKontak, setSubmittingKontak] = useState(false)
   const [formKontak, setFormKontak] = useState({
-    nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true, isGlobal: false
+    nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true, isGlobal: false, userId: ''
   })
+  const [expandedGroups, setExpandedGroups] = useState({})
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
+  const [mobileMenuKontakId, setMobileMenuKontakId] = useState(null)
 
   // ─── TAB 2A: AKUN PENGIRIM (DEVICES - ADMIN VIEW) STATE ───
   const [devicesList, setDevicesList] = useState([])
@@ -319,6 +398,7 @@ export default function KontakWaPage() {
       loadDevices()
       loadBlacklist()
       loadPengajuan()
+      getUsers().then(res => setUsersList(res.data || [])).catch(() => {})
     } else {
       loadMyDevice()
     }
@@ -339,20 +419,144 @@ export default function KontakWaPage() {
 
   // ─── TAB 1 HANDLERS (KONTAK PENERIMA) ───
 
-  const openAddKontak = () => {
+  const openAddKontak = (targetUserId = null) => {
     setEditKontakId(null)
-    setFormKontak({ nama: '', nomorWa: '', jabatan: '', instansi: '', catatan: '', aktif: true, isGlobal: false })
+    const isGlobal = targetUserId === 'global'
+    let assignedUserId = ''
+    if (targetUserId && targetUserId !== 'global') {
+      assignedUserId = targetUserId
+    } else if (!isAdmin) {
+      assignedUserId = user?.id || ''
+    }
+
+    setFormKontak({
+      nama: '',
+      nomorWa: '',
+      jabatan: '',
+      instansi: '',
+      catatan: '',
+      aktif: true,
+      isGlobal,
+      userId: assignedUserId
+    })
     setModalKontakOpen(true)
   }
 
   const openEditKontak = (k) => {
     setEditKontakId(k.id)
     setFormKontak({
-      nama: k.nama, nomorWa: k.nomorWa, jabatan: k.jabatan || '',
-      instansi: k.instansi || '', catatan: k.catatan || '', aktif: k.aktif,
-      isGlobal: Boolean(k.isGlobal)
+      nama: k.nama,
+      nomorWa: k.nomorWa,
+      jabatan: k.jabatan || '',
+      instansi: k.instansi || '',
+      catatan: k.catatan || '',
+      aktif: k.aktif,
+      isGlobal: Boolean(k.isGlobal),
+      userId: k.userId || ''
     })
     setModalKontakOpen(true)
+  }
+
+  // Group contacts by owner/creator
+  const groupedKontak = useMemo(() => {
+    const groupsMap = new Map()
+
+    kontakList.forEach((k) => {
+      let groupKey = ''
+      let groupName = ''
+      let groupRole = ''
+      let isGlobalGroup = false
+
+      if (k.isGlobal) {
+        groupKey = 'global'
+        groupName = 'Kantor / Global'
+        groupRole = 'GLOBAL'
+        isGlobalGroup = true
+      } else if (k.user) {
+        groupKey = `user-${k.userId}`
+        groupName = k.user.nama || k.user.username || `Surveyor #${k.userId}`
+        groupRole = k.user.role || 'SURVEYOR'
+      } else if (k.userId) {
+        groupKey = `user-${k.userId}`
+        groupName = `Surveyor #${k.userId}`
+        groupRole = 'SURVEYOR'
+      } else {
+        groupKey = 'unassigned'
+        groupName = 'Kantor / Global'
+        groupRole = 'GLOBAL'
+        isGlobalGroup = true
+      }
+
+      if (!groupsMap.has(groupKey)) {
+        groupsMap.set(groupKey, {
+          id: groupKey,
+          userId: k.userId || null,
+          name: groupName,
+          role: groupRole,
+          isGlobal: isGlobalGroup,
+          contacts: [],
+          lastUpdated: k.updatedAt || k.createdAt,
+        })
+      }
+
+      const grp = groupsMap.get(groupKey)
+      grp.contacts.push(k)
+      const itemDate = new Date(k.updatedAt || k.createdAt || 0)
+      const curDate = new Date(grp.lastUpdated || 0)
+      if (itemDate > curDate) {
+        grp.lastUpdated = k.updatedAt || k.createdAt
+      }
+    })
+
+    const result = Array.from(groupsMap.values())
+
+    // Apply kontakFilter if active
+    let filteredResult = result
+    if (kontakFilter === 'mine') {
+      filteredResult = result.filter(g => g.userId === user?.id)
+    } else if (kontakFilter === 'global') {
+      filteredResult = result.filter(g => g.isGlobal)
+    }
+
+    // Sort contacts inside each group by name
+    filteredResult.forEach(grp => {
+      grp.contacts.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''))
+    })
+
+    // Sort groups: if Elaine exists, place Elaine first to match mockup, or sort by lastUpdated desc
+    filteredResult.sort((a, b) => {
+      if (a.name.toLowerCase() === 'elaine') return -1
+      if (b.name.toLowerCase() === 'elaine') return 1
+      const dateA = new Date(a.lastUpdated || 0).getTime()
+      const dateB = new Date(b.lastUpdated || 0).getTime()
+      return dateB - dateA
+    })
+
+    return filteredResult
+  }, [kontakList, kontakFilter, user])
+
+  // Automatically expand first group by default, or all groups when searching
+  useEffect(() => {
+    if (groupedKontak.length > 0) {
+      setExpandedGroups(prev => {
+        if (searchKontak.trim()) {
+          const allOpen = {}
+          groupedKontak.forEach(g => { allOpen[g.id] = true })
+          return allOpen
+        }
+        if (Object.keys(prev).length === 0) {
+          return { [groupedKontak[0].id]: true }
+        }
+        return prev
+      })
+    }
+  }, [groupedKontak, searchKontak])
+
+  const toggleGroup = (groupId) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }))
   }
 
   // ─── TAB 2B HANDLERS (WHATSAPP SAYA - NON-ADMIN) ───
@@ -510,11 +714,15 @@ export default function KontakWaPage() {
     }
     try {
       setSubmittingKontak(true)
+      const payload = {
+        ...formKontak,
+        userId: formKontak.userId ? parseInt(formKontak.userId) : null
+      }
       if (editKontakId) {
-        await updateKontakWa(editKontakId, formKontak)
+        await updateKontakWa(editKontakId, payload)
         toast.success('Kontak WhatsApp berhasil diperbarui!')
       } else {
-        await createKontakWa(formKontak)
+        await createKontakWa(payload)
         toast.success('Kontak WhatsApp baru berhasil ditambahkan!')
       }
       setModalKontakOpen(false)
@@ -1893,41 +2101,87 @@ export default function KontakWaPage() {
       {/* ───────────────────────────────────────────────────────────── */}
       {activeTab === 'penerima' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Top Bar Penerima */}
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Contact size={16} className="text-primary" />
-                <span>{isAdmin ? 'Buku Kontak Penerima Laporan' : 'Buku Kontak Relasi Saya'}</span>
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {isAdmin 
-                  ? 'Daftar stakeholder/buyer yang akan menerima broadcast laporan sounding resmi.'
-                  : 'Kontak pribadi relasi bisnis Anda yang tersimpan aman untuk pengiriman laporan.'}
-              </p>
+          {/* Search & Filter Bar */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchKontak}
+                onChange={(e) => setSearchKontak(e.target.value)}
+                placeholder="Cari nama kontak..."
+                className="w-full h-11 pl-10 pr-9 bg-card border border-border/80 rounded-2xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-xs transition-colors"
+              />
+              {searchKontak && (
+                <button
+                  type="button"
+                  onClick={() => setSearchKontak('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <button
-              onClick={openAddKontak}
-              className="w-full sm:w-auto px-4 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
-            >
-              <Plus size={15} />
-              <span>{isAdmin ? 'Tambah Kontak' : 'Tambah Kontak Saya'}</span>
-            </button>
+
+            {/* Filter Button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowFilterDropdown(prev => !prev)}
+                className={`w-11 h-11 rounded-2xl border flex items-center justify-center transition-colors cursor-pointer shadow-xs ${
+                  kontakFilter !== 'all' || showFilterDropdown
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border/80 bg-card hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title="Filter Kontak"
+              >
+                <Filter size={16} />
+              </button>
+
+              {showFilterDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-20 bg-transparent" 
+                    onClick={() => setShowFilterDropdown(false)} 
+                  />
+                  <div className="absolute right-0 top-12 z-30 w-48 bg-card border border-border rounded-2xl shadow-xl p-2 animate-in fade-in zoom-in-95 space-y-1 text-xs">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase px-2 py-1 tracking-wider">
+                      Filter Kontak
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setKontakFilter('all'); setShowFilterDropdown(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium transition-colors cursor-pointer ${
+                        kontakFilter === 'all' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-secondary text-foreground'
+                      }`}
+                    >
+                      Semua Kontak
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setKontakFilter('mine'); setShowFilterDropdown(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium transition-colors cursor-pointer ${
+                        kontakFilter === 'mine' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-secondary text-foreground'
+                      }`}
+                    >
+                      👤 Kontak Pribadi Saya
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setKontakFilter('global'); setShowFilterDropdown(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium transition-colors cursor-pointer ${
+                        kontakFilter === 'global' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-secondary text-foreground'
+                      }`}
+                    >
+                      🏢 Kontak Kantor / Global
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={searchKontak}
-              onChange={(e) => setSearchKontak(e.target.value)}
-              placeholder="Cari nama stakeholder, instansi, jabatan, atau nomor WhatsApp..."
-              className="w-full h-10 pl-10 pr-4 bg-card border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
-            />
-          </div>
-
-          {/* Table of Contacts */}
+          {/* Table / Accordion Groups of Contacts */}
           {loadingKontak ? (
             <div className="flex flex-col items-center justify-center h-48 bg-card border border-border rounded-2xl">
               <Loader2 size={28} className="animate-spin text-primary mb-2" />
@@ -1944,216 +2198,278 @@ export default function KontakWaPage() {
               </p>
               {!searchKontak && (
                 <button
-                  onClick={openAddKontak}
+                  type="button"
+                  onClick={() => openAddKontak()}
                   className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                 >
                   <Plus size={14} /> Tambah Kontak Pertama
                 </button>
               )}
             </div>
+          ) : groupedKontak.length === 0 ? (
+            <div className="text-center py-12 bg-card border border-dashed border-border rounded-2xl p-6">
+              <p className="text-xs text-muted-foreground">Tidak ada kontak yang cocok dengan filter yang dipilih.</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {/* Mobile Card List (Screen < md) */}
-              <div className="block md:hidden space-y-3">
-                {kontakList.map((k) => {
-                  const canEdit = isAdmin || k.userId === user?.id
-                  const cleanPhone = k.nomorWa ? k.nomorWa.replace(/\D/g, '') : ''
-                  const waLink = `https://wa.me/${cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone}`
+            <div className="space-y-4">
+              {mobileMenuKontakId && (
+                <div 
+                  className="fixed inset-0 z-20 bg-transparent" 
+                  onClick={() => setMobileMenuKontakId(null)} 
+                />
+              )}
+              {groupedKontak.map((group) => {
+                const isExpanded = Boolean(expandedGroups[group.id])
+                const theme = getGroupTheme(group.name)
 
-                  return (
-                    <div key={k.id} className="p-4 bg-card border border-border rounded-2xl shadow-xs space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                            {k.nama.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-bold text-sm text-foreground">{k.nama}</div>
-                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                              {k.isGlobal ? (
-                                <span className="px-2 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
-                                  🏢 Kantor
-                                </span>
-                              ) : k.userId === user?.id ? (
-                                <span className="px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
-                                  👤 Pribadi
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.2 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
-                                  👤 {k.user?.nama || 'Petugas'}
-                                </span>
-                              )}
-                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                                k.aktif
-                                  ? 'bg-green-500/15 text-green-700 dark:text-green-300'
-                                  : 'bg-muted text-muted-foreground'
-                              }`}>
-                                {k.aktif ? 'Aktif' : 'Non-aktif'}
-                              </span>
-                            </div>
-                          </div>
+                return (
+                  <div
+                    key={group.id}
+                    className="bg-card border border-border/80 rounded-2xl sm:rounded-3xl shadow-xs overflow-hidden transition-all"
+                  >
+                    {/* Accordion Header */}
+                    <div
+                      onClick={() => toggleGroup(group.id)}
+                      className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-muted/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+                        {/* Circle Avatar with User Initial */}
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${theme.avatar} font-bold text-base sm:text-lg flex items-center justify-center shrink-0 shadow-xs`}>
+                          {group.name.charAt(0).toUpperCase()}
                         </div>
 
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-1">
-                          {canEdit ? (
-                            <>
-                              <button
-                                onClick={() => openEditKontak(k)}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-                                title="Edit Kontak"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteKontak(k)}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                                title="Hapus Kontak"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground italic flex items-center gap-1 bg-secondary/60 px-2 py-1 rounded-lg">
-                              <Lock size={10} /> Kantor
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm sm:text-base font-bold text-foreground truncate">
+                              Kontak Milik {group.name}
+                            </h3>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${theme.badge}`}>
+                              {group.contacts.length} kontak
                             </span>
-                          )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5 sm:mt-1 truncate">
+                            Terakhir diperbarui: {formatTerakhirDiperbarui(group.lastUpdated)}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Contact details */}
-                      <div className="grid grid-cols-1 gap-1.5 text-xs pt-2 border-t border-border/60">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">WhatsApp:</span>
-                          <a
-                            href={waLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-primary font-semibold hover:underline flex items-center gap-1"
-                          >
-                            <Phone size={12} />
-                            <span>{k.nomorWa}</span>
-                          </a>
+                      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        {/* Desktop: "+ Tambah Kontak" button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openAddKontak(group.userId || (group.isGlobal ? 'global' : null))
+                          }}
+                          className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-xs font-semibold transition-colors cursor-pointer active:scale-95 shadow-xs"
+                        >
+                          <Plus size={14} />
+                          <span>Tambah Kontak</span>
+                        </button>
+
+                        {/* Chevron Toggle */}
+                        <div className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer">
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                         </div>
-                        {(k.jabatan || k.instansi) && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">Jabatan / Instansi:</span>
-                            <span className="text-foreground font-medium text-right">
-                              {[k.jabatan, k.instansi].filter(Boolean).join(' - ') || '-'}
-                            </span>
-                          </div>
-                        )}
-                        {k.catatan && (
-                          <div className="flex items-start justify-between gap-2 text-muted-foreground">
-                            <span className="shrink-0">Catatan:</span>
-                            <span className="italic text-right text-[11px]">{k.catatan}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
-                  )
-                })}
-              </div>
 
-              {/* Desktop Table View (Screen >= md) */}
-              <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-secondary/60 text-muted-foreground font-semibold border-b border-border text-[11px] uppercase tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">Nama Penerima</th>
-                        <th className="px-4 py-3">Nomor WhatsApp</th>
-                        <th className="px-4 py-3">Jabatan & Instansi</th>
-                        <th className="px-4 py-3">Catatan</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                        <th className="px-4 py-3 text-right">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {kontakList.map((k) => {
-                        const canEdit = isAdmin || k.userId === user?.id
-                        return (
-                          <tr key={k.id} className="hover:bg-secondary/30 transition-colors">
-                            <td className="px-4 py-3 font-semibold text-foreground">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                                  {k.nama.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span>{k.nama}</span>
-                                    {k.isGlobal ? (
-                                      <span className="px-2 py-0.2 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
-                                        🏢 Kantor
+                    {/* Expanded Content */}
+                    {isExpanded && (
+                      <div className="border-t border-border/60 animate-fade-in">
+                        {/* Desktop Table View (Screen >= md) */}
+                        <div className="hidden md:block overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-transparent text-muted-foreground/80 font-bold text-[11px] uppercase tracking-wider border-b border-border/60">
+                              <tr>
+                                <th className="px-5 py-3.5">Nama Penerima</th>
+                                <th className="px-5 py-3.5">Nomor WhatsApp</th>
+                                <th className="px-5 py-3.5">Jabatan & Instansi</th>
+                                <th className="px-5 py-3.5">Catatan</th>
+                                <th className="px-5 py-3.5 text-center">Status</th>
+                                <th className="px-5 py-3.5 text-right">Aksi</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                              {group.contacts.map((k) => {
+                                const canEdit = isAdmin || k.userId === user?.id
+                                return (
+                                  <tr key={k.id} className="hover:bg-muted/20 transition-colors">
+                                    <td className="px-5 py-3.5 font-semibold text-foreground">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full ${theme.contactAvatar} font-bold text-xs flex items-center justify-center shrink-0`}>
+                                          {k.nama.charAt(0).toUpperCase()}
+                                        </div>
+                                        <span className="font-bold text-foreground text-xs sm:text-sm">
+                                          {k.nama}
+                                        </span>
+                                      </div>
+                                    </td>
+
+                                    <td className="px-5 py-3.5 font-mono">
+                                      <div className="flex items-center gap-2 text-foreground font-medium">
+                                        <WhatsAppIcon className="w-4 h-4 text-[#25D366] shrink-0" />
+                                        <span>{k.nomorWa}</span>
+                                      </div>
+                                    </td>
+
+                                    <td className="px-5 py-3.5">
+                                      <div className="font-bold text-foreground text-xs">
+                                        {k.jabatan || '-'}
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                                        {k.instansi || '-'}
+                                      </div>
+                                    </td>
+
+                                    <td className="px-5 py-3.5 text-muted-foreground text-xs">
+                                      {k.catatan || '-'}
+                                    </td>
+
+                                    <td className="px-5 py-3.5 text-center">
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                                        k.aktif
+                                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40'
+                                          : 'bg-muted text-muted-foreground border border-border'
+                                      }`}>
+                                        {k.aktif ? 'Aktif' : 'Non-aktif'}
                                       </span>
-                                    ) : k.userId === user?.id ? (
-                                      <span className="px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
-                                        👤 Pribadi
-                                      </span>
-                                    ) : (
-                                      <span className="px-2 py-0.2 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold text-[10px]">
-                                        👤 {k.user?.nama || 'Petugas'}
-                                      </span>
-                                    )}
+                                    </td>
+
+                                    <td className="px-5 py-3.5 text-right">
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        {canEdit ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => openEditKontak(k)}
+                                              className="w-7 h-7 rounded-lg border border-border hover:border-blue-400 text-muted-foreground hover:text-blue-600 flex items-center justify-center transition-colors cursor-pointer"
+                                              title="Edit Kontak"
+                                            >
+                                              <Pencil size={13} />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setConfirmDeleteKontak(k)}
+                                              className="w-7 h-7 rounded-lg border border-red-200/70 hover:border-red-400 text-red-500 hover:bg-red-500/10 flex items-center justify-center transition-colors cursor-pointer"
+                                              title="Hapus Kontak"
+                                            >
+                                              <Trash2 size={13} />
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <span className="text-[11px] text-muted-foreground italic flex items-center gap-1">
+                                            <Lock size={11} /> Kontak Kantor
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Mobile Card List (Screen < md) */}
+                        <div className="block md:hidden divide-y divide-border/60">
+                          {group.contacts.map((k) => {
+                            const canEdit = isAdmin || k.userId === user?.id
+                            return (
+                              <div key={k.id} className="p-3.5 sm:p-4 flex items-center justify-between gap-3 relative">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {/* Avatar circle */}
+                                  <div className={`w-9 h-9 rounded-full ${theme.contactAvatar} font-bold text-xs flex items-center justify-center shrink-0`}>
+                                    {k.nama.charAt(0).toUpperCase()}
+                                  </div>
+
+                                  {/* Contact Details */}
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-sm text-foreground truncate">
+                                      {k.nama}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 font-mono">
+                                      <span>{k.nomorWa}</span>
+                                      <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366] shrink-0" />
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                                      {[k.jabatan, k.instansi].filter(Boolean).join(' · ') || '-'}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 font-mono text-muted-foreground">
-                              <div className="flex items-center gap-1.5">
-                                <Phone size={12} className="text-primary shrink-0" />
-                                <span>{k.nomorWa}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="text-foreground font-medium">{k.jabatan || '-'}</div>
-                              <div className="text-[11px] text-muted-foreground">{k.instansi || '-'}</div>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
-                              {k.catatan || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                k.aktif
-                                  ? 'bg-green-500/15 text-green-700 dark:text-green-300'
-                                  : 'bg-muted text-muted-foreground'
-                              }`}>
-                                {k.aktif ? 'Aktif' : 'Non-aktif'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {canEdit ? (
-                                  <>
-                                    <button
-                                      onClick={() => openEditKontak(k)}
-                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-                                      title="Edit Kontak"
-                                    >
-                                      <Pencil size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => setConfirmDeleteKontak(k)}
-                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                                      title="Hapus Kontak"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground italic flex items-center gap-1">
-                                    <Lock size={11} /> Kontak Kantor
+
+                                {/* Status & 3-dots Menu */}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                    k.aktif
+                                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40'
+                                      : 'bg-muted text-muted-foreground border border-border'
+                                  }`}>
+                                    {k.aktif ? 'Aktif' : 'Non-aktif'}
                                   </span>
-                                )}
+
+                                  {canEdit && (
+                                    <div className="relative">
+                                      <button
+                                        type="button"
+                                        onClick={() => setMobileMenuKontakId(mobileMenuKontakId === k.id ? null : k.id)}
+                                        className="p-1.5 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg hover:bg-secondary transition-colors"
+                                        title="Menu Aksi"
+                                      >
+                                        <MoreVertical size={16} />
+                                      </button>
+
+                                      {/* Mobile Popup Menu */}
+                                      {mobileMenuKontakId === k.id && (
+                                        <div className="absolute right-0 top-8 z-30 w-36 bg-card border border-border rounded-xl shadow-lg py-1 animate-in fade-in zoom-in-95">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setMobileMenuKontakId(null)
+                                              openEditKontak(k)
+                                            }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-secondary flex items-center gap-2 cursor-pointer"
+                                          >
+                                            <Pencil size={13} className="text-blue-500" />
+                                            <span>Edit Kontak</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setMobileMenuKontakId(null)
+                                              setConfirmDeleteKontak(k)
+                                            }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-500/10 flex items-center gap-2 cursor-pointer"
+                                          >
+                                            <Trash2 size={13} className="text-red-500" />
+                                            <span>Hapus Kontak</span>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                            )
+                          })}
+
+                          {/* Mobile Full-width "+ Tambah Kontak" Button at bottom */}
+                          <div className="p-3.5 sm:p-4">
+                            <button
+                              type="button"
+                              onClick={() => openAddKontak(group.userId || (group.isGlobal ? 'global' : null))}
+                              className="w-full h-10 rounded-xl border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-98 shadow-xs"
+                            >
+                              <Plus size={15} />
+                              <span>Tambah Kontak</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -2746,17 +3062,32 @@ export default function KontakWaPage() {
               )}
 
               {isAdmin && (
-                <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10">
-                  <input
-                    type="checkbox"
-                    id="isGlobalKontak"
-                    checked={formKontak.isGlobal}
-                    onChange={e => setFormKontak(f => ({ ...f, isGlobal: e.target.checked }))}
-                    className="w-4 h-4 text-blue-600 rounded border-border"
-                  />
-                  <label htmlFor="isGlobalKontak" className="text-xs font-semibold text-foreground cursor-pointer">
-                    🏢 Jadikan Kontak Umum Kantor (Tampil untuk semua surveyor)
-                  </label>
+                <div className="space-y-1.5 pt-1">
+                  <label className={labelCls}>Pemilik / Surveyor Kontak</label>
+                  <select
+                    value={formKontak.isGlobal ? 'global' : (formKontak.userId || '')}
+                    onChange={e => {
+                      const val = e.target.value
+                      if (val === 'global') {
+                        setFormKontak(f => ({ ...f, isGlobal: true, userId: '' }))
+                      } else {
+                        setFormKontak(f => ({ ...f, isGlobal: false, userId: val }))
+                      }
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="global">🏢 Kontak Umum Kantor (Semua Surveyor)</option>
+                    {usersList.map(u => (
+                      <option key={u.id} value={u.id}>
+                        👤 {u.nama || u.username} ({u.role})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {formKontak.isGlobal 
+                      ? 'Kontak ini akan muncul di grup Kontak Kantor / Global dan dapat diakses semua surveyor.' 
+                      : 'Kontak ini akan dikelompokkan ke dalam container surveyor yang dipilih.'}
+                  </p>
                 </div>
               )}
 
