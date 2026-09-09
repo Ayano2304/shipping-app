@@ -1681,418 +1681,599 @@ export default function KontakWaPage() {
       {/* TAB 2B: WHATSAPP SAYA (SELF-SERVICE QR KHUSUS NON-ADMIN)       */}
       {/* ───────────────────────────────────────────────────────────── */}
       {activeTab === 'my-device' && (
-        <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="flex items-center justify-between pb-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
-                  <Smartphone size={22} />
+        <div className="space-y-4 sm:space-y-5 animate-fade-in max-w-4xl mx-auto">
+          {/* Header Card */}
+          <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Smartphone size={22} />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-foreground">Koneksi WhatsApp Saya</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tautkan akun WhatsApp HP Anda untuk mengirim laporan perhitungan CPO secara otomatis
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={loadMyDevice}
+              disabled={loadingMyDevice}
+              className="px-3.5 py-2 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+              title="Perbarui Status"
+            >
+              <RefreshCw size={13} className={loadingMyDevice ? 'animate-spin' : ''} />
+              <span>Perbarui</span>
+            </button>
+          </div>
+
+          {loadingMyDevice ? (
+            <div className="bg-card border border-border rounded-2xl p-12 flex flex-col items-center justify-center shadow-xs">
+              <Loader2 size={28} className="animate-spin text-primary mb-2" />
+              <div className="text-xs text-muted-foreground">Memeriksa status WhatsApp Anda...</div>
+            </div>
+          ) : myDevice?.status === 'connected' ? (
+            <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/25 flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <span>WhatsApp Terhubung</span>
+                      <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-700 dark:text-green-300 font-bold text-[10px]">
+                        🟢 ONLINE
+                      </span>
+                    </div>
+                    <div className="text-xs font-mono text-muted-foreground mt-0.5">
+                      Nomor: +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-base font-bold text-foreground">Koneksi WhatsApp Saya</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Tautkan akun WhatsApp HP Anda untuk mengirim laporan perhitungan CPO secara otomatis
+                <button
+                  onClick={() => handleDisconnectMyDevice()}
+                  className="px-3.5 py-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Putuskan Koneksi
+                </button>
+              </div>
+
+              {myDevice.izinKirim === false ? (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100">
+                    <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Izin Pengiriman Ditangguhkan oleh Administrator</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    WhatsApp Anda terhubung ke server, namun saat ini Administrator menangguhkan izin pengiriman laporan untuk akun Anda. Anda belum dapat mengirim laporan via bot sampai Administrator mengaktifkannya kembali.
                   </p>
                 </div>
-              </div>
-              <button
-                onClick={loadMyDevice}
-                disabled={loadingMyDevice}
-                className="p-2 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
-                title="Refresh Status"
-              >
-                <RefreshCw size={14} className={loadingMyDevice ? 'animate-spin' : ''} />
-              </button>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs text-muted-foreground space-y-1">
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-green-500" /> Siap Mengirim Laporan:
+                  </div>
+                  <p>
+                    Setiap kali Anda menekan tombol <strong>Kirim via Bot Server</strong> di halaman pengiriman, laporan & PDF akan terkirim langsung dari nomor WhatsApp Anda.
+                  </p>
+                </div>
+              )}
             </div>
-
-            {loadingMyDevice ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 size={28} className="animate-spin text-primary mb-2" />
-                <div className="text-xs text-muted-foreground">Memeriksa status WhatsApp Anda...</div>
-              </div>
-            ) : myDevice?.status === 'connected' ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/25 flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
-                      <CheckCircle2 size={20} />
+          ) : myDevice?.statusAktivasi === 'MENUNGGU_AKTIVASI' && !showEditPhone ? (
+            <div className="space-y-4 sm:space-y-5 animate-fade-in">
+              {/* CARD 1: Status Aktivasi Menunggu Admin */}
+              <div className="bg-amber-50/40 dark:bg-amber-950/20 border border-amber-300/70 dark:border-amber-800/60 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
+                {/* Desktop Header */}
+                <div className="hidden sm:flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Clock size={20} />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-foreground flex items-center gap-2">
-                        <span>WhatsApp Terhubung</span>
-                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-700 dark:text-green-300 font-bold text-[10px]">
-                          🟢 ONLINE
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h3 className="text-base font-bold text-foreground">
+                          Pengajuan Aktivasi Paket Sedang Diproses
+                        </h3>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-xs font-semibold border border-amber-200 dark:border-amber-800/60">
+                          <span>⏳</span> Menunggu Administrator
                         </span>
                       </div>
-                      <div className="text-xs font-mono text-muted-foreground mt-0.5">
-                        Nomor: +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                        <span>Nomor WhatsApp:</span>
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">
+                          +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}
+                        </span>
                       </div>
                     </div>
                   </div>
                   <button
-                    onClick={() => handleDisconnectMyDevice()}
-                    className="px-3.5 py-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold transition-colors cursor-pointer"
+                    type="button"
+                    onClick={loadMyDevice}
+                    disabled={loadingMyDevice}
+                    className="w-9 h-9 rounded-xl border border-border/80 bg-card hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                    title="Periksa Pembaruan Status"
                   >
-                    Putuskan Koneksi
+                    <RefreshCw size={14} className={loadingMyDevice ? 'animate-spin' : ''} />
                   </button>
                 </div>
 
-                {myDevice.izinKirim === false ? (
-                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-200 space-y-1">
-                    <div className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100">
-                      <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>Izin Pengiriman Ditangguhkan oleh Administrator</span>
-                    </div>
-                    <p className="leading-relaxed">
-                      WhatsApp Anda terhubung ke server, namun saat ini Administrator menangguhkan izin pengiriman laporan untuk akun Anda. Anda belum dapat mengirim laporan via bot sampai Administrator mengaktifkannya kembali.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs text-muted-foreground space-y-1">
-                    <div className="font-semibold text-foreground flex items-center gap-1.5">
-                      <CheckCircle2 size={14} className="text-green-500" /> Siap Mengirim Laporan:
-                    </div>
-                    <p>
-                      Setiap kali Anda menekan tombol <strong>Kirim via Bot Server</strong> di halaman pengiriman, laporan & PDF akan terkirim langsung dari nomor WhatsApp Anda.
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : myDevice?.statusAktivasi === 'MENUNGGU_AKTIVASI' && !showEditPhone ? (
-              <div className="space-y-4 animate-fade-in">
-                {/* Banner Status Menunggu Aktivasi Paket Admin */}
-                <div className="p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 space-y-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                        <Clock size={22} className="animate-pulse" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-foreground flex items-center gap-2">
-                          <span>Pengajuan Aktivasi Paket Sedang Diproses</span>
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-[10px]">
-                            ⏳ Menunggu Administrator
-                          </span>
-                        </div>
-                        <div className="text-xs font-mono font-semibold text-primary mt-0.5">
-                          Nomor WhatsApp: +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}
-                        </div>
-                      </div>
+                {/* Mobile Header */}
+                <div className="block sm:hidden space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Clock size={20} />
                     </div>
                     <button
+                      type="button"
                       onClick={loadMyDevice}
                       disabled={loadingMyDevice}
-                      className="p-2 rounded-xl border border-border bg-card hover:bg-secondary text-foreground transition-colors cursor-pointer"
+                      className="w-8 h-8 rounded-xl border border-border/80 bg-card hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                       title="Periksa Pembaruan Status"
                     >
                       <RefreshCw size={14} className={loadingMyDevice ? 'animate-spin' : ''} />
                     </button>
                   </div>
-
-                  <div className="p-3.5 rounded-xl bg-card/80 border border-amber-500/20 text-xs text-muted-foreground space-y-2">
-                    <p className="leading-relaxed">
-                      Nomor WhatsApp Anda telah diajukan ke server sistem. Karena batasan kuota server Fonnte (maksimal 1 perangkat aktif pada paket Free), <strong>Administrator sedang mengaktifkan/membeli paket slot perangkat Anda</strong> di dashboard Fonnte.
-                    </p>
-                    <div className="p-2.5 rounded-lg bg-secondary/50 border border-border flex items-center gap-2 text-foreground font-medium text-[11px]">
-                      <Info size={14} className="text-blue-500 shrink-0" />
-                      <span>Anda akan menerima <strong>notifikasi lonceng otomatis</strong> segera setelah Administrator menyetujui, dan tombol pairing (Kode / Scan QR) akan langsung terbuka.</span>
-                    </div>
-                  </div>
-
-                  {/* Indikator Alur 3 Langkah */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
-                      <CheckCircle2 size={16} className="shrink-0" />
-                      <div>
-                        <div className="font-bold text-[11px]">Langkah 1: Selesai</div>
-                        <div className="text-[10px] opacity-80">Nomor tersimpan & terdaftar</div>
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center gap-2 text-amber-800 dark:text-amber-200 ring-1 ring-amber-500/30">
-                      <Clock size={16} className="shrink-0 animate-pulse" />
-                      <div>
-                        <div className="font-bold text-[11px]">Langkah 2: Proses</div>
-                        <div className="text-[10px] opacity-80">Aktivasi paket Fonnte oleh Admin</div>
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-secondary/60 border border-border flex items-center gap-2 text-muted-foreground">
-                      <Lock size={16} className="shrink-0" />
-                      <div>
-                        <div className="font-bold text-[11px]">Langkah 3: Menunggu</div>
-                        <div className="text-[10px]">Tautkan Kode / Scan QR</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-between border-t border-amber-500/20 text-xs">
-                    <span className="text-[11px] text-muted-foreground">Perlu mengganti nomor?</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputPhone(myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '')
-                        setShowEditPhone(true)
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-foreground text-xs font-semibold cursor-pointer transition-colors"
-                    >
-                      Ubah Nomor Pengajuan
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : myDevice?.statusAktivasi === 'DITOLAK' && !showEditPhone ? (
-              <div className="space-y-4 animate-fade-in">
-                <div className="p-5 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 space-y-3 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                      <AlertTriangle size={22} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-foreground">Pengajuan Aktivasi WhatsApp Ditolak</div>
-                      <div className="text-xs text-rose-600 dark:text-rose-400 mt-0.5">
-                        Alasan: {myDevice.catatanAdmin || 'Pengajuan tidak disetujui oleh Administrator.'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputPhone(myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '')
-                        setShowEditPhone(true)
-                      }}
-                      className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-xs"
-                    >
-                      Ajukan Ulang Nomor WhatsApp
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : !myDevice || !myDevice.statusAktivasi || showEditPhone ? (
-              <div className="space-y-4 animate-fade-in">
-                <div className="p-4 rounded-xl bg-secondary/60 border border-border flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
-                    <Smartphone size={20} />
-                  </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-bold text-foreground">
-                      {showEditPhone ? 'Ubah Nomor WhatsApp Pengajuan' : 'Daftarkan Nomor WhatsApp Anda'}
+                    <h3 className="text-sm font-bold text-foreground">
+                      Pengajuan Aktivasi Paket Sedang Diproses
+                    </h3>
+                    <div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-xs font-semibold border border-amber-200 dark:border-amber-800/60">
+                        <span>⏳</span> Menunggu Administrator
+                      </span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Karena akun WhatsApp pengirim menggunakan server Fonnte, sistem akan mendaftarkan slot nomor Anda terlebih dahulu. Administrator akan mengaktifkan paket Fonnte untuk perangkat Anda, kemudian Anda dapat menghubungkannya via Kode Pairing atau Scan QR tanpa kendala limitasi akun Free.
-                    </p>
+                    <div className="pt-1 text-xs text-muted-foreground">
+                      <div>Nomor WhatsApp</div>
+                      <div className="font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                        +{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <form onSubmit={handleAjukanSinkronisasi} className="p-4 sm:p-5 rounded-xl border border-dashed border-border bg-card space-y-4">
-                  {/* Input Nomor HP */}
-                  <div className="space-y-1.5 bg-secondary/40 p-3.5 rounded-xl border border-border">
-                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      <Phone size={13} className="text-primary" /> Nomor WhatsApp HP Anda <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={inputPhone}
-                      onChange={(e) => setInputPhone(e.target.value)}
-                      placeholder="Contoh: 08960536022 atau 62896..."
-                      className="w-full max-w-sm h-10 px-3.5 bg-background border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
-                      required
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Format nomor otomatis disesuaikan (08... atau 628...). Pastikan nomor ini aktif di aplikasi WhatsApp HP Anda.
-                    </p>
+                {/* Deskripsi Alasan & Limitasi Fonnte */}
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  Nomor WhatsApp Anda telah diajukan ke server sistem. Karena batasan kuota server Fonnte (maksimal 1 perangkat aktif pada paket Free), <strong className="text-foreground">Administrator sedang mengaktifkan/membeli paket slot perangkat Anda</strong> di dashboard Fonnte.
+                </div>
+
+                {/* Info Callout Box */}
+                <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 flex items-start gap-2.5 text-xs text-foreground">
+                  <div className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <Info size={13} />
+                  </div>
+                  <div className="leading-relaxed text-muted-foreground">
+                    Anda akan menerima <strong className="text-foreground">notifikasi lonceng otomatis</strong> segera setelah Administrator menyetujui, dan tombol pairing (Kode / Scan QR) akan langsung terbuka.
+                  </div>
+                </div>
+
+                {/* Stepper Section */}
+                <div className="space-y-3 pt-1">
+                  <h4 className="text-xs font-bold text-foreground">Proses Aktivasi</h4>
+
+                  {/* Desktop Stepper */}
+                  <div className="hidden sm:grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2">
+                    {/* Step 1 */}
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3 h-full">
+                      <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                        <Check size={13} strokeWidth={3} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                          Langkah 1: Selesai
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Nomor tersimpan & terdaftar
+                        </div>
+                        <div className="text-[11px] text-muted-foreground font-mono mt-1">
+                          {formatTerakhirDiperbarui(myDevice.updatedAt || myDevice.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dotted Connector 1 */}
+                    <div className="w-6 border-t-2 border-dashed border-emerald-500/40 shrink-0" />
+
+                    {/* Step 2 */}
+                    <div className="p-4 rounded-2xl bg-card border-2 border-amber-400 dark:border-amber-500/80 shadow-xs flex items-start gap-3 h-full">
+                      <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 text-xs font-bold mt-0.5 shadow-xs">
+                        2
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                          Langkah 2: Proses
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Aktivasi paket Fonnte oleh Admin
+                        </div>
+                        <div className="mt-2">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-[10px] font-semibold border border-amber-200 dark:border-amber-800/50">
+                            Sedang Diproses
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dotted Connector 2 */}
+                    <div className="w-6 border-t-2 border-dashed border-border shrink-0" />
+
+                    {/* Step 3 */}
+                    <div className="p-4 rounded-2xl bg-muted/40 border border-border flex items-start gap-3 h-full">
+                      <div className="w-6 h-6 rounded-full border border-border bg-card flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
+                        <Lock size={12} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-foreground">
+                          Langkah 3: Menunggu
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Tautkan Kode / Scan QR
+                        </div>
+                        <div className="mt-2">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-secondary text-muted-foreground text-[10px] font-semibold border border-border">
+                            Belum Tersedia
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Panduan Alur Pengajuan */}
-                  <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground space-y-1.5">
-                    <div className="font-bold text-foreground flex items-center gap-1.5">
-                      <Info size={14} className="text-primary" />
-                      <span>Alur Aktivasi WhatsApp Surveyor:</span>
+                  {/* Mobile Stepper */}
+                  <div className="block sm:hidden space-y-2">
+                    {/* Step 1 */}
+                    <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                        <Check size={13} strokeWidth={3} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                          Langkah 1: Selesai
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Nomor tersimpan & terdaftar
+                        </div>
+                        <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                          {formatTerakhirDiperbarui(myDevice.updatedAt || myDevice.createdAt)}
+                        </div>
+                      </div>
                     </div>
-                    <ol className="list-decimal list-inside space-y-1 pl-1">
-                      <li>Ketik nomor WhatsApp Anda lalu klik tombol <strong>"Simpan & Ajukan Sinkronisasi WhatsApp"</strong>.</li>
-                      <li>Administrator menerima notifikasi dan akan mengaktifkan/membeli paket perangkat di Fonnte.</li>
-                      <li>Begitu disetujui, Anda menerima notifikasi dan form untuk memasukkan Kode Pairing / Scan QR akan otomatis terbuka.</li>
+
+                    {/* Step 2 */}
+                    <div className="p-3.5 rounded-2xl bg-card border-2 border-amber-400 dark:border-amber-500/80 shadow-xs flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 text-xs font-bold mt-0.5 shadow-xs">
+                        2
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                          Langkah 2: Proses
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Aktivasi paket Fonnte oleh Admin
+                        </div>
+                        <div className="mt-1.5">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 text-[10px] font-semibold border border-amber-200 dark:border-amber-800/50">
+                            Sedang Diproses
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="p-3.5 rounded-2xl bg-muted/40 border border-border flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full border border-border bg-card flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
+                        <Lock size={12} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-foreground">
+                          Langkah 3: Menunggu
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Tautkan Kode / Scan QR
+                        </div>
+                        <div className="mt-1.5">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-secondary text-muted-foreground text-[10px] font-semibold border border-border">
+                            Belum Tersedia
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 2: Action Card Perlu Ubah Nomor */}
+              <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Pencil size={18} />
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm font-bold text-foreground">
+                      Perlu mengganti nomor WhatsApp?
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Pastikan nomor yang digunakan aktif dan dapat menerima pesan WhatsApp.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInputPhone(myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '')
+                    setShowEditPhone(true)
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-blue-500/40 bg-card hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-xs font-semibold cursor-pointer transition-colors shadow-xs shrink-0 text-center"
+                >
+                  Ubah Nomor Pengajuan
+                </button>
+              </div>
+
+              {/* CARD 3: Trust Card Aman & Terlindungi */}
+              <div className="bg-blue-50/40 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 rounded-2xl p-4 sm:p-5 shadow-xs flex items-start gap-3.5">
+                <ShieldCheck size={20} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="text-xs sm:text-sm font-bold text-foreground">
+                    Aman & Terlindungi
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Nomor WhatsApp Anda hanya digunakan untuk kebutuhan pengiriman laporan CPO dan tidak akan dibagikan kepada pihak lain.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : myDevice?.statusAktivasi === 'DITOLAK' && !showEditPhone ? (
+            <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-xs space-y-4 animate-fade-in">
+              <div className="p-5 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 space-y-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-foreground">Pengajuan Aktivasi WhatsApp Ditolak</div>
+                    <div className="text-xs text-rose-600 dark:text-rose-400 mt-0.5">
+                      Alasan: {myDevice.catatanAdmin || 'Pengajuan tidak disetujui oleh Administrator.'}
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputPhone(myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '')
+                      setShowEditPhone(true)
+                    }}
+                    className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-xs"
+                  >
+                    Ajukan Ulang Nomor WhatsApp
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : !myDevice || !myDevice.statusAktivasi || showEditPhone ? (
+            <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-xs space-y-4 animate-fade-in">
+              <div className="p-4 rounded-xl bg-secondary/60 border border-border flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
+                  <Smartphone size={20} />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm font-bold text-foreground">
+                    {showEditPhone ? 'Ubah Nomor WhatsApp Pengajuan' : 'Daftarkan Nomor WhatsApp Anda'}
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Karena akun WhatsApp pengirim menggunakan server Fonnte, sistem akan mendaftarkan slot nomor Anda terlebih dahulu. Administrator akan mengaktifkan paket Fonnte untuk perangkat Anda, kemudian Anda dapat menghubungkannya via Kode Pairing atau Scan QR tanpa kendala limitasi akun Free.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleAjukanSinkronisasi} className="p-4 sm:p-5 rounded-xl border border-dashed border-border bg-card space-y-4">
+                {/* Input Nomor HP */}
+                <div className="space-y-1.5 bg-secondary/40 p-3.5 rounded-xl border border-border">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Phone size={13} className="text-primary" /> Nomor WhatsApp HP Anda <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={inputPhone}
+                    onChange={(e) => setInputPhone(e.target.value)}
+                    placeholder="Contoh: 08960536022 atau 62896..."
+                    className="w-full max-w-sm h-10 px-3.5 bg-background border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
+                    required
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Format nomor otomatis disesuaikan (08... atau 628...). Pastikan nomor ini aktif di aplikasi WhatsApp HP Anda.
+                  </p>
+                </div>
+
+                {/* Panduan Alur Pengajuan */}
+                <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground space-y-1.5">
+                  <div className="font-bold text-foreground flex items-center gap-1.5">
+                    <Info size={14} className="text-primary" />
+                    <span>Alur Aktivasi WhatsApp Surveyor:</span>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 pl-1">
+                    <li>Ketik nomor WhatsApp Anda lalu klik tombol <strong>"Simpan & Ajukan Sinkronisasi WhatsApp"</strong>.</li>
+                    <li>Administrator menerima notifikasi dan akan mengaktifkan/membeli paket perangkat di Fonnte.</li>
+                    <li>Begitu disetujui, Anda menerima notifikasi dan form untuk memasukkan Kode Pairing / Scan QR akan otomatis terbuka.</li>
+                  </ol>
+                </div>
+
+                <div className="pt-2 flex items-center gap-2 flex-wrap">
+                  <button
+                    type="submit"
+                    disabled={submittingPengajuan}
+                    className="px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                  >
+                    {submittingPengajuan ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Send size={14} />
+                    )}
+                    <span>Simpan & Ajukan Sinkronisasi WhatsApp</span>
+                  </button>
+                  {showEditPhone && myDevice && (
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPhone(false)}
+                      className="px-4 py-2.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-xs space-y-4 animate-fade-in">
+              {/* Banner Status Disetujui Admin */}
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div className="space-y-0.5 flex-1">
+                  <div className="text-xs sm:text-sm font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5 flex-wrap">
+                    <span>🎉 Paket WhatsApp Telah Diaktifkan oleh Administrator!</span>
+                  </div>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                    Nomor WhatsApp Anda (<strong>+{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}</strong>) siap dihubungkan. Silakan pilih metode di bawah untuk menyelesaikan proses pairing.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 rounded-xl border border-dashed border-border bg-card space-y-4">
+                {/* Pilihan Metode: Kode vs QR */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground">
+                    Pilih Cara Menghubungkan WhatsApp:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setConnectMethod('code')}
+                      className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                        connectMethod === 'code'
+                          ? 'bg-primary/10 border-primary text-foreground ring-1 ring-primary/40'
+                          : 'bg-secondary/40 border-border text-muted-foreground hover:bg-secondary/70'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${connectMethod === 'code' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                        <Hash size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold flex items-center gap-1.5">
+                          <span>Tautkan dengan Kode</span>
+                          <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
+                            Rekomendasi HP
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                          Gunakan kode 8-digit langsung di WhatsApp tanpa perlu scan kamera.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setConnectMethod('qr')}
+                      className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                        connectMethod === 'qr'
+                          ? 'bg-primary/10 border-primary text-foreground ring-1 ring-primary/40'
+                          : 'bg-secondary/40 border-border text-muted-foreground hover:bg-secondary/70'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${connectMethod === 'qr' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                        <QrCode size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold flex items-center gap-1.5">
+                          <span>Scan Barcode QR</span>
+                          <span className="px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
+                            Laptop / PC
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                          Scan barcode QR di layar laptop menggunakan kamera WhatsApp di HP.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input Nomor HP */}
+                <div className="space-y-1.5 bg-secondary/40 p-3.5 rounded-xl border border-border">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Phone size={13} className="text-primary" /> Nomor WhatsApp HP Anda <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={inputPhone}
+                    onChange={(e) => setInputPhone(e.target.value)}
+                    placeholder="Contoh: 08960536022 atau 62896..."
+                    className="w-full max-w-sm h-10 px-3.5 bg-background border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Nomor ini telah didaftarkan dan disetujui Administrator untuk slot perangkat Fonnte Anda.
+                  </p>
+                </div>
+
+                {/* Panduan Langkah Sesuai Metode */}
+                {connectMethod === 'code' ? (
+                  <div className="space-y-1.5 bg-muted/40 p-3.5 rounded-xl border border-border/60">
+                    <div className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-1">
+                      <Smartphone size={14} className="text-primary" />
+                      <span>Langkah Tautkan dengan Kode di WhatsApp HP:</span>
+                    </div>
+                    <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1 leading-relaxed">
+                      <li>Pastikan nomor WhatsApp Anda sudah sesuai di atas, lalu klik <strong>"Dapatkan Kode Pairing (HP)"</strong>.</li>
+                      <li>Buka aplikasi WhatsApp di HP Anda → Menu titik tiga / Pengaturan.</li>
+                      <li>Pilih <strong>Perangkat Tertaut</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
+                      <li>Ketuk pilihan <strong>"Tautkan dengan nomor telepon saja"</strong> (Link with phone number instead) di bagian paling bawah layar HP.</li>
+                      <li>Ketik 8 digit kode yang muncul di layar ini ke WhatsApp Anda.</li>
                     </ol>
                   </div>
+                ) : (
+                  <div className="space-y-1.5 bg-muted/40 p-3.5 rounded-xl border border-border/60">
+                    <div className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-1">
+                      <QrCode size={14} className="text-primary" />
+                      <span>Langkah Scan Barcode QR di Laptop:</span>
+                    </div>
+                    <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1 leading-relaxed">
+                      <li>Pastikan nomor WhatsApp Anda sudah sesuai di atas, lalu klik <strong>"Generate & Scan Barcode QR"</strong>.</li>
+                      <li>Buka aplikasi WhatsApp di HP Anda → Menu titik tiga / Pengaturan.</li>
+                      <li>Pilih <strong>Perangkat Tertaut</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
+                      <li>Arahkan kamera WhatsApp HP Anda ke Barcode QR yang muncul di layar ini.</li>
+                    </ol>
+                  </div>
+                )}
 
-                  <div className="pt-2 flex items-center gap-2 flex-wrap">
-                    <button
-                      type="submit"
-                      disabled={submittingPengajuan}
-                      className="px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
-                    >
-                      {submittingPengajuan ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Send size={14} />
-                      )}
-                      <span>Simpan & Ajukan Sinkronisasi WhatsApp</span>
-                    </button>
-                    {showEditPhone && myDevice && (
-                      <button
-                        type="button"
-                        onClick={() => setShowEditPhone(false)}
-                        className="px-4 py-2.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold cursor-pointer"
-                      >
-                        Batal
-                      </button>
+                <div className="pt-2 flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleConnectMyDevice(inputPhone, connectMethod)}
+                    disabled={connectingMyDevice}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                  >
+                    {connectingMyDevice ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : connectMethod === 'code' ? (
+                      <Hash size={15} />
+                    ) : (
+                      <QrCode size={15} />
                     )}
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <div className="space-y-4 animate-fade-in">
-                {/* Banner Status Disetujui Admin */}
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 size={20} />
-                  </div>
-                  <div className="space-y-0.5 flex-1">
-                    <div className="text-xs sm:text-sm font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5 flex-wrap">
-                      <span>🎉 Paket WhatsApp Telah Diaktifkan oleh Administrator!</span>
-                    </div>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
-                      Nomor WhatsApp Anda (<strong>+{myDevice.nomorWa ? myDevice.nomorWa.replace(/\D/g, '') : '-'}</strong>) siap dihubungkan. Silakan pilih metode di bawah untuk menyelesaikan proses pairing.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 sm:p-5 rounded-xl border border-dashed border-border bg-card space-y-4">
-                  {/* Pilihan Metode: Kode vs QR */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-foreground">
-                      Pilih Cara Menghubungkan WhatsApp:
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setConnectMethod('code')}
-                        className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
-                          connectMethod === 'code'
-                            ? 'bg-primary/10 border-primary text-foreground ring-1 ring-primary/40'
-                            : 'bg-secondary/40 border-border text-muted-foreground hover:bg-secondary/70'
-                        }`}
-                      >
-                        <div className={`p-2 rounded-lg shrink-0 ${connectMethod === 'code' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                          <Hash size={16} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold flex items-center gap-1.5">
-                            <span>Tautkan dengan Kode</span>
-                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
-                              Rekomendasi HP
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                            Gunakan kode 8-digit langsung di WhatsApp tanpa perlu scan kamera.
-                          </p>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setConnectMethod('qr')}
-                        className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
-                          connectMethod === 'qr'
-                            ? 'bg-primary/10 border-primary text-foreground ring-1 ring-primary/40'
-                            : 'bg-secondary/40 border-border text-muted-foreground hover:bg-secondary/70'
-                        }`}
-                      >
-                        <div className={`p-2 rounded-lg shrink-0 ${connectMethod === 'qr' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                          <QrCode size={16} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold flex items-center gap-1.5">
-                            <span>Scan Barcode QR</span>
-                            <span className="px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
-                              Laptop / PC
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                            Scan barcode QR di layar laptop menggunakan kamera WhatsApp di HP.
-                          </p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Input Nomor HP */}
-                  <div className="space-y-1.5 bg-secondary/40 p-3.5 rounded-xl border border-border">
-                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      <Phone size={13} className="text-primary" /> Nomor WhatsApp HP Anda <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={inputPhone}
-                      onChange={(e) => setInputPhone(e.target.value)}
-                      placeholder="Contoh: 08960536022 atau 62896..."
-                      className="w-full max-w-sm h-10 px-3.5 bg-background border border-border rounded-xl text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-xs transition-colors"
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Nomor ini telah didaftarkan dan disetujui Administrator untuk slot perangkat Fonnte Anda.
-                    </p>
-                  </div>
-
-                  {/* Panduan Langkah Sesuai Metode */}
-                  {connectMethod === 'code' ? (
-                    <div className="space-y-1.5 bg-muted/40 p-3.5 rounded-xl border border-border/60">
-                      <div className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-1">
-                        <Smartphone size={14} className="text-primary" />
-                        <span>Langkah Tautkan dengan Kode di WhatsApp HP:</span>
-                      </div>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1 leading-relaxed">
-                        <li>Pastikan nomor WhatsApp Anda sudah sesuai di atas, lalu klik <strong>"Dapatkan Kode Pairing (HP)"</strong>.</li>
-                        <li>Buka aplikasi WhatsApp di HP Anda → Menu titik tiga / Pengaturan.</li>
-                        <li>Pilih <strong>Perangkat Tertaut</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
-                        <li>Ketuk pilihan <strong>"Tautkan dengan nomor telepon saja"</strong> (Link with phone number instead) di bagian paling bawah layar HP.</li>
-                        <li>Ketik 8 digit kode yang muncul di layar ini ke WhatsApp Anda.</li>
-                      </ol>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5 bg-muted/40 p-3.5 rounded-xl border border-border/60">
-                      <div className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-1">
-                        <QrCode size={14} className="text-primary" />
-                        <span>Langkah Scan Barcode QR di Laptop:</span>
-                      </div>
-                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside pl-1 leading-relaxed">
-                        <li>Pastikan nomor WhatsApp Anda sudah sesuai di atas, lalu klik <strong>"Generate & Scan Barcode QR"</strong>.</li>
-                        <li>Buka aplikasi WhatsApp di HP Anda → Menu titik tiga / Pengaturan.</li>
-                        <li>Pilih <strong>Perangkat Tertaut</strong> → Ketuk <strong>Tautkan Perangkat</strong>.</li>
-                        <li>Arahkan kamera WhatsApp HP Anda ke Barcode QR yang muncul di layar ini.</li>
-                      </ol>
-                    </div>
-                  )}
-
-                  <div className="pt-2 flex items-center gap-3 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => handleConnectMyDevice(inputPhone, connectMethod)}
-                      disabled={connectingMyDevice}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
-                    >
-                      {connectingMyDevice ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : connectMethod === 'code' ? (
-                        <Hash size={15} />
-                      ) : (
-                        <QrCode size={15} />
-                      )}
-                      <span>
-                        {connectMethod === 'code' ? 'Dapatkan Kode Pairing (HP)' : 'Generate & Scan Barcode QR'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowEditPhone(true)}
-                      className="px-3 py-2 text-xs text-muted-foreground hover:text-foreground underline transition-colors cursor-pointer"
-                    >
-                      Ajukan Nomor Baru
-                    </button>
-                  </div>
+                    <span>
+                      {connectMethod === 'code' ? 'Dapatkan Kode Pairing (HP)' : 'Generate & Scan Barcode QR'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPhone(true)}
+                    className="px-3 py-2 text-xs text-muted-foreground hover:text-foreground underline transition-colors cursor-pointer"
+                  >
+                    Ajukan Nomor Baru
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
