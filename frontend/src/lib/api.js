@@ -35,7 +35,7 @@ export const getMe = () => api.get('/auth/me')
 export const changePassword = (data) => api.post('/auth/change-password', data)
 
 // Kapal
-export const getKapal = () => api.get('/kapal')
+export const getKapal = (params) => api.get('/kapal', { params })
 export const createKapal = (data) => api.post('/kapal', data)
 export const updateKapal = (id, data) => api.put(`/kapal/${id}`, data)
 export const deleteKapal = (id) => api.delete(`/kapal/${id}`)

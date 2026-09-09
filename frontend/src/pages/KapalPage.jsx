@@ -18,7 +18,7 @@ export default function KapalPage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
-  const [form, setForm] = useState({ namaKapal: '' })
+  const [form, setForm] = useState({ namaKapal: '', isAktif: true })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null) // null | { id, nama, pengirimanCount }
@@ -32,9 +32,20 @@ export default function KapalPage() {
 
   if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" replace />
 
-  const openAdd = () => { setForm({ namaKapal: '' }); setError(''); setModal({ mode: 'add' }) }
-  const openEdit = (k) => { setForm({ namaKapal: k.namaKapal }); setError(''); setModal({ mode: 'edit', data: k }) }
+  const openAdd = () => { setForm({ namaKapal: '', isAktif: true }); setError(''); setModal({ mode: 'add' }) }
+  const openEdit = (k) => { setForm({ namaKapal: k.namaKapal, isAktif: k.isAktif !== false }); setError(''); setModal({ mode: 'edit', data: k }) }
   const closeModal = () => { setModal(null); setError('') }
+
+  const handleToggleStatus = async (k) => {
+    try {
+      const nextStatus = !(k.isAktif !== false)
+      await updateKapal(k.id, { isAktif: nextStatus })
+      toast.success(`Status armada ${k.namaKapal} diubah menjadi ${nextStatus ? 'Aktif' : 'Tidak Beroperasi'}`)
+      load()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Gagal mengubah status armada.')
+    }
+  }
 
   const openUpload = (k) => {
     setUploadModal({ kapal: k })
@@ -141,19 +152,6 @@ export default function KapalPage() {
   const persenTerkalibrasi = totalKapal > 0 ? Math.round((terkalibrasiCount / totalKapal) * 100) : 0
   const totalPengiriman = list.reduce((sum, k) => sum + (k._count?.pengiriman || 0), 0)
 
-  const terdaftarTerbaru = list.length > 0
-    ? [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
-    : null
-
-  const terdaftarTerbaruTgl = terdaftarTerbaru
-    ? new Date(terdaftarTerbaru.createdAt).toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      })
-    : '—'
-  const terdaftarTerbaruNama = terdaftarTerbaru?.namaKapal || '—'
-
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -226,10 +224,19 @@ export default function KapalPage() {
                               <span className="text-xs text-muted-foreground mt-0.5 block">
                                 Terdaftar: {new Date(k.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                               </span>
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 mt-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"></span>
-                                ARMADA AKTIF
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStatus(k)}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border mt-2 transition-all cursor-pointer ${
+                                  k.isAktif !== false
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                                    : 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border-zinc-500/20 hover:bg-zinc-500/20'
+                                }`}
+                                title="Klik untuk mengubah status armada"
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${k.isAktif !== false ? 'bg-emerald-500' : 'bg-zinc-400'}`}></span>
+                                {k.isAktif !== false ? '● ARMADA AKTIF' : '● TIDAK BEROPERASI'}
+                              </button>
                             </div>
                           </div>
                         </td>
@@ -332,9 +339,19 @@ export default function KapalPage() {
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Terdaftar: {new Date(k.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                           </p>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 mt-1.5">
-                            ARMADA AKTIF
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(k)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border mt-1.5 transition-all cursor-pointer ${
+                              k.isAktif !== false
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                : 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border-zinc-500/20'
+                            }`}
+                            title="Klik untuk mengubah status armada"
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${k.isAktif !== false ? 'bg-emerald-500' : 'bg-zinc-400'}`}></span>
+                            {k.isAktif !== false ? '● ARMADA AKTIF' : '● TIDAK BEROPERASI'}
+                          </button>
                         </div>
                       </div>
                       <button
@@ -424,7 +441,7 @@ export default function KapalPage() {
       {/* Bottom Summary Cards (Desktop & Mobile) */}
       <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-xs">
         {/* Desktop View */}
-        <div className="hidden md:grid md:grid-cols-4 gap-6 divide-x divide-border/60">
+        <div className="hidden md:grid md:grid-cols-3 gap-6 divide-x divide-border/60">
           {/* 1. Total Kapal */}
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
@@ -460,22 +477,10 @@ export default function KapalPage() {
               <span className="text-[11px] text-muted-foreground">Seluruh kapal</span>
             </div>
           </div>
-
-          {/* 4. Terdaftar Terbaru */}
-          <div className="flex items-center gap-4 pl-6">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
-              <Calendar size={22} />
-            </div>
-            <div>
-              <span className="text-xs font-medium text-muted-foreground block">Terdaftar Terbaru</span>
-              <span className="text-lg font-bold text-foreground font-mono block leading-tight">{terdaftarTerbaruTgl}</span>
-              <span className="text-[11px] text-muted-foreground truncate block max-w-[120px]">{terdaftarTerbaruNama}</span>
-            </div>
-          </div>
         </div>
 
         {/* Mobile View */}
-        <div className="grid grid-cols-4 gap-2 md:hidden text-center divide-x divide-border/60">
+        <div className="grid grid-cols-3 gap-2 md:hidden text-center divide-x divide-border/60">
           <div className="space-y-1">
             <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
               <Ship size={16} />
@@ -498,14 +503,6 @@ export default function KapalPage() {
             </div>
             <span className="text-base font-bold text-foreground font-mono block">{totalPengiriman}</span>
             <span className="text-[10px] text-muted-foreground font-medium block">Pengiriman</span>
-          </div>
-
-          <div className="space-y-1 pl-1">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
-              <Calendar size={16} />
-            </div>
-            <span className="text-xs font-bold text-foreground font-mono block leading-tight">{terdaftarTerbaruTgl}</span>
-            <span className="text-[10px] text-muted-foreground font-medium block truncate">Terdaftar Terbaru</span>
           </div>
         </div>
       </div>
@@ -542,8 +539,23 @@ export default function KapalPage() {
               onKeyDown={e => e.key === 'Enter' && handleSave()}
               placeholder="contoh: HK III, HK IV, TK. SAMUDRA 01"
               autoFocus
-              className="w-full h-10 px-3 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary mb-4"
+              className="w-full h-10 px-3 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary mb-3"
             />
+            <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl border border-border mb-4">
+              <div>
+                <div className="text-xs font-semibold text-foreground">Status Armada</div>
+                <div className="text-[11px] text-muted-foreground">{form.isAktif ? 'Armada Aktif & Beroperasi' : 'Tidak Beroperasi'}</div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.isAktif}
+                  onChange={e => setForm(f => ({ ...f, isAktif: e.target.checked }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
+            </div>
             <div className="flex gap-2">
               <button onClick={closeModal} className="flex-1 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-secondary cursor-pointer">Batal</button>
               <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-sm">

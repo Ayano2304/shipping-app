@@ -18,12 +18,14 @@ export default function ConfirmDialog({
   message = 'Apakah Anda yakin?',
   onConfirm,
   onCancel,
+  onClose,
   confirmText = 'Hapus',
   cancelText = 'Batal',
   variant = 'danger',
 }) {
   if (!open) return null
 
+  const handleCancel = onCancel || onClose
   const isDanger = variant === 'danger'
 
   return (
@@ -31,14 +33,14 @@ export default function ConfirmDialog({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onCancel}
+        onClick={handleCancel}
       />
 
       {/* Dialog */}
       <div className="relative bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in">
         {/* Close button */}
         <button
-          onClick={onCancel}
+          onClick={handleCancel}
           className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-secondary transition-colors"
         >
           <X size={15} />
@@ -63,7 +65,7 @@ export default function ConfirmDialog({
         {/* Actions */}
         <div className="flex gap-2">
           <button
-            onClick={onCancel}
+            onClick={handleCancel}
             className="flex-1 py-2.5 border border-border rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
           >
             {cancelText}

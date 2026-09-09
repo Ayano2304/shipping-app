@@ -188,7 +188,7 @@ export default function PengirimanFormPage() {
               <CustomSelect
                 value={form.kapalId}
                 onChange={(val) => setForm(f => ({ ...f, kapalId: val }))}
-                options={kapalList.map(k => ({ value: k.id, label: k.namaKapal }))}
+                options={kapalList.filter(k => k.isAktif !== false || k.id === form.kapalId).map(k => ({ value: k.id, label: k.namaKapal }))}
                 placeholder="-- Pilih Kapal --"
                 icon={Ship}
                 searchable={kapalList.length > 4}

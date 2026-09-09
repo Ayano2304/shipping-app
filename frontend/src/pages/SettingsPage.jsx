@@ -115,7 +115,9 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-xl font-bold text-foreground">Pengaturan Akun & Sistem</h1>
         <p className="text-xs sm:text-sm text-muted-foreground">
-          Kelola profil pengguna, keamanan akun, dan integrasi WhatsApp
+          {user?.role === 'PETUGAS'
+            ? 'Kelola profil pengguna dan keamanan akun'
+            : 'Kelola profil pengguna, keamanan akun, dan integrasi WhatsApp'}
         </p>
       </div>
 

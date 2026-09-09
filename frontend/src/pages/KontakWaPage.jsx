@@ -282,7 +282,6 @@ export default function KontakWaPage() {
   // Test Message Modal State
   const [testModal, setTestModal] = useState({ open: false, device: null, target: '', loading: false })
   const [confirmDeleteDevice, setConfirmDeleteDevice] = useState(null)
-  const [confirmResetDevice, setConfirmResetDevice] = useState(null)
   const [copiedTokenId, setCopiedTokenId] = useState(null)
   const [cardMenuOpenId, setCardMenuOpenId] = useState(null)
 
@@ -1371,34 +1370,12 @@ export default function KontakWaPage() {
                                 type="button"
                                 onClick={() => {
                                   setCardMenuOpenId(null)
-                                  handleSetDefaultDevice(dev)
-                                }}
-                                className="w-full px-3.5 py-2.5 text-left flex items-center gap-2.5 hover:bg-secondary text-foreground font-medium cursor-pointer"
-                              >
-                                <Star size={14} className={dev.isDefault ? 'text-amber-500 fill-amber-500' : 'text-muted-foreground'} />
-                                <span>{dev.isDefault ? 'Pengirim Default (Aktif)' : 'Jadikan Default'}</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCardMenuOpenId(null)
                                   handleCopyToken(dev)
                                 }}
                                 className="w-full px-3.5 py-2.5 text-left flex items-center gap-2.5 hover:bg-secondary text-foreground font-medium cursor-pointer"
                               >
                                 <Copy size={14} className="text-muted-foreground" />
                                 <span>Salin Token Device</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCardMenuOpenId(null)
-                                  setConfirmResetDevice(dev)
-                                }}
-                                className="w-full px-3.5 py-2.5 text-left flex items-center gap-2.5 hover:bg-secondary text-foreground font-medium cursor-pointer"
-                              >
-                                <RotateCw size={14} className="text-muted-foreground" />
-                                <span>Reset Token / Putus</span>
                               </button>
                               {dev.nomorWa && (
                                 <button
@@ -1448,13 +1425,13 @@ export default function KontakWaPage() {
                           </div>
                         </div>
 
-                        {/* Row 2: Status Pengiriman Bot */}
+                        {/* Row 2: Status Pengiriman */}
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl sm:rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                             <Bot size={18} />
                           </div>
                           <div>
-                            <div className="text-xs text-muted-foreground font-medium">Status Pengiriman Bot</div>
+                            <div className="text-xs text-muted-foreground font-medium">Status Pengiriman</div>
                             <div className={`flex items-center gap-1.5 text-xs sm:text-sm font-bold mt-0.5 ${
                               dev.izinKirim !== false ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
                             }`}>
@@ -1535,23 +1512,8 @@ export default function KontakWaPage() {
                         <ChevronDown size={15} />
                       </button>
 
-                      {/* 4 Action Buttons */}
+                      {/* Action Buttons */}
                       <div className="flex items-center gap-2">
-                        {/* Favorit */}
-                        <button
-                          type="button"
-                          onClick={() => handleSetDefaultDevice(dev)}
-                          className={`min-w-[62px] px-3.5 py-2 rounded-2xl border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer shadow-2xs ${
-                            dev.isDefault
-                              ? 'border-amber-400 bg-amber-50/70 dark:bg-amber-950/25 text-amber-500'
-                              : 'border-border bg-card hover:bg-secondary text-slate-600 dark:text-slate-400'
-                          }`}
-                          title={dev.isDefault ? 'Pengirim Default Aktif' : 'Jadikan Pengirim Default'}
-                        >
-                          <Star size={16} className={dev.isDefault ? 'fill-amber-400 text-amber-500' : ''} />
-                          <span className="text-[10px] font-medium">Favorit</span>
-                        </button>
-
                         {/* Blokir */}
                         <button
                           type="button"
@@ -1562,17 +1524,6 @@ export default function KontakWaPage() {
                         >
                           <Ban size={16} />
                           <span className="text-[10px] font-medium">Blokir</span>
-                        </button>
-
-                        {/* Reset Token */}
-                        <button
-                          type="button"
-                          onClick={() => setConfirmResetDevice(dev)}
-                          className="min-w-[62px] px-3.5 py-2 rounded-2xl border border-border bg-card hover:bg-secondary text-slate-600 dark:text-slate-400 shadow-2xs transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
-                          title="Reset Token / Putuskan Koneksi"
-                        >
-                          <RotateCw size={16} />
-                          <span className="text-[10px] font-medium whitespace-nowrap">Reset Token</span>
                         </button>
 
                         {/* Hapus */}
@@ -1618,20 +1569,7 @@ export default function KontakWaPage() {
 
                       {/* Mobile List Group Menu */}
                       <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border/60 shadow-2xs">
-                        {/* Row 1: Favorit */}
-                        <button
-                          type="button"
-                          onClick={() => handleSetDefaultDevice(dev)}
-                          className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-secondary/60 transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3 text-foreground font-semibold text-xs">
-                            <Star size={16} className={dev.isDefault ? 'text-amber-500 fill-amber-500' : 'text-muted-foreground'} />
-                            <span>{dev.isDefault ? 'Favorit (Default)' : 'Favorit'}</span>
-                          </div>
-                          <ChevronRight size={16} className="text-muted-foreground" />
-                        </button>
-
-                        {/* Row 2: Blokir */}
+                        {/* Blokir */}
                         <button
                           type="button"
                           onClick={() => setConfirmBlacklistDevice(dev)}
@@ -1645,20 +1583,7 @@ export default function KontakWaPage() {
                           <ChevronRight size={16} className="text-muted-foreground" />
                         </button>
 
-                        {/* Row 3: Reset Token */}
-                        <button
-                          type="button"
-                          onClick={() => setConfirmResetDevice(dev)}
-                          className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-secondary/60 transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3 text-foreground font-semibold text-xs">
-                            <RotateCw size={16} className="text-muted-foreground" />
-                            <span>Reset Token</span>
-                          </div>
-                          <ChevronRight size={16} className="text-muted-foreground" />
-                        </button>
-
-                        {/* Row 4: Hapus */}
+                        {/* Hapus */}
                         <button
                           type="button"
                           onClick={() => setConfirmDeleteDevice(dev)}
@@ -2473,7 +2398,7 @@ export default function KontakWaPage() {
                           <table className="w-full text-left text-xs">
                             <thead className="bg-transparent text-muted-foreground/80 font-bold text-[11px] uppercase tracking-wider border-b border-border/60">
                               <tr>
-                                <th className="px-5 py-3.5">Nama Penerima</th>
+                                <th className="px-5 py-3.5">Nama Kontak</th>
                                 <th className="px-5 py-3.5">Nomor WhatsApp</th>
                                 <th className="px-5 py-3.5">Jabatan & Instansi</th>
                                 <th className="px-5 py-3.5">Catatan</th>
@@ -3167,7 +3092,7 @@ export default function KontakWaPage() {
           <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <h3 className="text-sm font-bold text-foreground">
-                {editKontakId ? 'Edit Kontak Penerima' : 'Tambah Kontak Penerima Baru'}
+                {editKontakId ? 'Edit Kontak' : 'Tambah Kontak Baru'}
               </h3>
               <button
                 onClick={() => setModalKontakOpen(false)}
@@ -3235,22 +3160,6 @@ export default function KontakWaPage() {
                   className="w-full p-2.5 bg-secondary border border-border rounded-xl text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
-
-              {/* Checkbox status hanya muncul saat edit kontak. Saat tambah kontak baru, otomatis aktif */}
-              {editKontakId && (
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="aktifKontak"
-                    checked={formKontak.aktif}
-                    onChange={e => setFormKontak(f => ({ ...f, aktif: e.target.checked }))}
-                    className="w-4 h-4 text-primary rounded border-border focus:ring-primary cursor-pointer"
-                  />
-                  <label htmlFor="aktifKontak" className="text-xs font-semibold text-foreground cursor-pointer">
-                    Kontak Aktif (Dapat dipilih untuk pengiriman laporan)
-                  </label>
-                </div>
-              )}
 
               {isAdmin && (
                 <div className="space-y-1.5 pt-1">
@@ -3596,6 +3505,7 @@ export default function KontakWaPage() {
       {/* Confirm Blacklist Device Quick Action */}
       <ConfirmDialog
         open={Boolean(confirmBlacklistDevice)}
+        onCancel={() => setConfirmBlacklistDevice(null)}
         onClose={() => setConfirmBlacklistDevice(null)}
         onConfirm={handleQuickBlacklist}
         title="Blokir Nomor WhatsApp Pengirim (Blacklist)"
@@ -3604,25 +3514,10 @@ export default function KontakWaPage() {
         variant="danger"
       />
 
-      {/* Confirm Reset Token / Putuskan Perangkat */}
-      <ConfirmDialog
-        open={Boolean(confirmResetDevice)}
-        onClose={() => setConfirmResetDevice(null)}
-        onConfirm={() => {
-          if (confirmResetDevice) {
-            handleDisconnectDevice(confirmResetDevice)
-            setConfirmResetDevice(null)
-          }
-        }}
-        title="Reset Token & Putuskan Perangkat"
-        message={`Apakah Anda yakin ingin mereset token dan memutuskan sesi WhatsApp untuk perangkat "${confirmResetDevice?.nama}"? Anda harus menautkan ulang WhatsApp setelahnya.`}
-        confirmText="Ya, Reset Token"
-        variant="warning"
-      />
-
       {/* Confirm Unblock Blacklist */}
       <ConfirmDialog
         open={Boolean(confirmDeleteBlacklist)}
+        onCancel={() => setConfirmDeleteBlacklist(null)}
         onClose={() => setConfirmDeleteBlacklist(null)}
         onConfirm={handleDeleteBlacklist}
         title="Buka Blokir Nomor WhatsApp"

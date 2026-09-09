@@ -11,6 +11,7 @@ datasource db {
 model Kapal {
   id            Int             @id @default(autoincrement())
   namaKapal     String          @unique @map("nama_kapal") @db.VarChar(100)
+  isAktif       Boolean         @default(true) @map("is_aktif")
   createdAt     DateTime        @default(now()) @map("created_at")
   densityTable  DensityTable[]
   pengiriman    Pengiriman[]

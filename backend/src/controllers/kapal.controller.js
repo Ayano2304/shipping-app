@@ -2,7 +2,14 @@ const prisma = require('../lib/prisma');
 
 exports.getAll = async (req, res) => {
   try {
+    const { aktifOnly } = req.query;
+    const where = {};
+    if (aktifOnly === 'true') {
+      where.isAktif = true;
+    }
+
     const kapal = await prisma.kapal.findMany({
+      where,
       orderBy: { namaKapal: 'asc' },
       include: { _count: { select: { pengiriman: true, soundingTable: true, densityTable: true } } }
     });
@@ -66,9 +73,11 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { namaKapal } = req.body;
+    const { namaKapal, isAktif } = req.body;
     if (!namaKapal || !namaKapal.trim()) return res.status(400).json({ error: 'Nama kapal wajib diisi.' });
-    const kapal = await prisma.kapal.create({ data: { namaKapal: namaKapal.trim() } });
+    const data = { namaKapal: namaKapal.trim() };
+    if (typeof isAktif === 'boolean') data.isAktif = isAktif;
+    const kapal = await prisma.kapal.create({ data });
     res.status(201).json(kapal);
   } catch (err) {
     if (err.code === 'P2002') return res.status(400).json({ error: 'Nama kapal sudah ada.' });
@@ -78,11 +87,18 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const { namaKapal } = req.body;
-    if (!namaKapal || !namaKapal.trim()) return res.status(400).json({ error: 'Nama kapal wajib diisi.' });
+    const { namaKapal, isAktif } = req.body;
+    const data = {};
+    if (namaKapal !== undefined && namaKapal.trim()) data.namaKapal = namaKapal.trim();
+    if (typeof isAktif === 'boolean') data.isAktif = isAktif;
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'Tidak ada data perubahan yang dikirim.' });
+    }
+
     const kapal = await prisma.kapal.update({
       where: { id: parseInt(req.params.id) },
-      data: { namaKapal: namaKapal.trim() }
+      data
     });
     res.json(kapal);
   } catch (err) {
