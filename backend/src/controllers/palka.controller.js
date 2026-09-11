@@ -1,20 +1,51 @@
 const prisma = require('../lib/prisma');
 
 // Hitung berat palka dengan metode Excel (Rounding terpisah Tinggi + Point)
-const hitungBerat = async (kapalId, tinggiCm, point, suhu, faktorKoreksi) => {
+const hitungBerat = async (kapalId, tinggiCm, point, suhu, faktorKoreksi, namaPalka) => {
   if (!kapalId || !tinggiCm || suhu === undefined || suhu === null || !faktorKoreksi) return null;
   
   try {
-    // Lookup volume dari sounding table
-    const soundingData = await prisma.soundingTable.findFirst({
-      where: { kapalId: parseInt(kapalId), tinggiCm: parseInt(tinggiCm) }
-    });
+    const kapalIdInt = parseInt(kapalId);
+    const tinggiInt = parseInt(tinggiCm);
+    let soundingData = null;
+
+    // Lookup volume dari sounding table berdasarkan palka spesifik
+    if (namaPalka && typeof namaPalka === 'string' && namaPalka.trim()) {
+      const cleanNama = namaPalka.trim();
+      // 1. Coba exact case-insensitive match
+      soundingData = await prisma.soundingTable.findFirst({
+        where: {
+          kapalId: kapalIdInt,
+          tinggiCm: tinggiInt,
+          namaPalka: { equals: cleanNama, mode: 'insensitive' }
+        }
+      });
+
+      // 2. Normalisasi format (misal: '3P' -> 'PALKA 3 P')
+      if (!soundingData) {
+        const compact = cleanNama.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const allPalkaRows = await prisma.soundingTable.findMany({
+          where: { kapalId: kapalIdInt, tinggiCm: tinggiInt }
+        });
+        soundingData = allPalkaRows.find(r => {
+          const rCompact = (r.namaPalka || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          return rCompact === compact || rCompact.endsWith(compact) || compact.endsWith(rCompact);
+        });
+      }
+    }
+
+    // 3. Fallback jika namaPalka belum ada atau belum cocok
+    if (!soundingData) {
+      soundingData = await prisma.soundingTable.findFirst({
+        where: { kapalId: kapalIdInt, tinggiCm: tinggiInt }
+      });
+    }
     
     if (!soundingData) return null;
     
     // Lookup density dari density table
     const densityData = await prisma.densityTable.findFirst({
-      where: { kapalId: parseInt(kapalId), suhu: parseInt(suhu) }
+      where: { kapalId: kapalIdInt, suhu: parseInt(suhu) }
     });
     
     if (!densityData) return null;
@@ -117,7 +148,8 @@ exports.saveBatch = async (req, res) => {
         p.tinggiCm,
         p.point,
         p.suhu,
-        p.faktorKoreksi || 1.0
+        p.faktorKoreksi || 1.0,
+        p.namaPalka
       );
       
       dataToInsert.push({
