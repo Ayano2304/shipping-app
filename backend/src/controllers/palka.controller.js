@@ -60,10 +60,9 @@ const hitungBerat = async (kapalId, tinggiCm, point, suhu, faktorKoreksi, namaPa
     const density = parseFloat(densityData.density);
     const faktor = parseFloat(faktorKoreksi || 1.0);
     
-    // Metode Excel: Rounding terpisah Tinggi + Point
-    const beratTinggi = Math.round(volumeBase * density * faktor);
-    const beratPoint = pointValue > 0 ? Math.round(volumePoint * density * faktor) : 0;
-    const beratHasil = beratTinggi + beratPoint;
+    // Standar sounding maritim / Berita Acara: Volume dibulatkan ke liter bulat, kemudian dikalikan density & faktor
+    const volumeBulat = Math.round(volumeFinal);
+    const beratHasil = Math.round(volumeBulat * density * faktor);
     
     return {
       volumeLiter: volumeFinal,

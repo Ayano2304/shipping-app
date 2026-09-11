@@ -4,22 +4,15 @@ export const toKg = (nilai, satuan) => {
   return satuan === 'MT' ? parseFloat(nilai) * 1000 : parseFloat(nilai)
 }
 
-// Hitung berat satu palka dengan metode Excel (Rounding komponen Tinggi + Point)
+// Hitung berat satu palka dengan standar sounding maritim (Volume dibulatkan ke liter bulat * density * faktor)
 export const hitungBeratPalka = (volumeLiter, point, density, faktorKoreksi, volumeBase, bedaLiter = 403) => {
   const vTotal = parseFloat(volumeLiter)
   const d = parseFloat(density)
   const f = parseFloat(faktorKoreksi || 1.0)
-  const p = parseFloat(point || 0)
   if (!vTotal || !d || !f || isNaN(vTotal) || isNaN(d) || isNaN(f)) return 0
   
-  const vB = volumeBase !== undefined && volumeBase !== null && volumeBase !== '' && !isNaN(volumeBase)
-    ? parseFloat(volumeBase)
-    : (vTotal - (p * bedaLiter))
-  const vP = p * bedaLiter
-  
-  const beratTinggi = Math.round(vB * d * f)
-  const beratPoint = p > 0 ? Math.round(vP * d * f) : 0
-  return beratTinggi + beratPoint
+  const vBulat = Math.round(vTotal)
+  return Math.round(vBulat * d * f)
 }
 
 // Hitung total berat dari array palka
