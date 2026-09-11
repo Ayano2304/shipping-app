@@ -16,6 +16,7 @@ model Kapal {
   densityTable  DensityTable[]
   pengiriman    Pengiriman[]
   soundingTable SoundingTable[]
+  palkaKapal    PalkaKapal[]
 
   @@map("kapal")
 }
@@ -76,17 +77,31 @@ model DataPalka {
   @@map("data_palka")
 }
 
-// Tabel Sounding - Lookup volume berdasarkan tinggi (per kapal)
+// Master Palka Kapal - Spesifikasi jumlah dan nama palka konstan per kapal
+model PalkaKapal {
+  id        Int      @id @default(autoincrement())
+  kapalId   Int      @map("kapal_id")
+  namaPalka String   @map("nama_palka") @db.VarChar(50)
+  urutan    Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  kapal     Kapal    @relation(fields: [kapalId], references: [id], onDelete: Cascade)
+
+  @@unique([kapalId, namaPalka])
+  @@map("palka_kapal")
+}
+
+// Tabel Sounding - Lookup volume berdasarkan tinggi & palka (per kapal)
 model SoundingTable {
   id          Int      @id @default(autoincrement())
   kapalId     Int      @map("kapal_id")
+  namaPalka   String   @default("") @map("nama_palka") @db.VarChar(50)
   tinggiCm    Int      @map("tinggi_cm")
   volumeLiter Decimal  @map("volume_liter") @db.Decimal(12, 4)
   bedaLiter   Decimal  @default(403) @map("beda_liter") @db.Decimal(8, 4)
   createdAt   DateTime @default(now()) @map("created_at")
   kapal       Kapal    @relation(fields: [kapalId], references: [id], onDelete: Cascade)
 
-  @@unique([kapalId, tinggiCm])
+  @@unique([kapalId, namaPalka, tinggiCm])
   @@map("sounding_table")
 }
 

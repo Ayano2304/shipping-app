@@ -32,4 +32,15 @@ router.post('/sounding', auth, roleGuard('ADMIN'), masterdataController.createSo
 router.put('/sounding/:id', auth, roleGuard('ADMIN'), masterdataController.updateSounding);
 router.delete('/sounding/:id', auth, roleGuard('ADMIN'), masterdataController.deleteSounding);
 
+// CRUD Density
+router.post('/density', auth, roleGuard('ADMIN'), masterdataController.createDensity);
+router.put('/density/:id', auth, roleGuard('ADMIN'), masterdataController.updateDensity);
+router.delete('/density/:id', auth, roleGuard('ADMIN'), masterdataController.deleteDensity);
+
+// CRUD Palka Kapal
+router.get('/kapal/:kapalId/palka', auth, masterdataController.getPalkaKapal);
+router.post('/kapal/:kapalId/palka', auth, roleGuard('ADMIN'), masterdataController.createPalkaKapal);
+router.put('/palka/:id', auth, roleGuard('ADMIN'), masterdataController.updatePalkaKapal);
+router.delete('/palka/:id', auth, roleGuard('ADMIN'), masterdataController.deletePalkaKapal);
+
 module.exports = router;

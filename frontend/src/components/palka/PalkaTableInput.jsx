@@ -16,14 +16,14 @@ const defaultRow = (urutan) => ({
   density: '',
 })
 
-export default function PalkaTableInput({ value = [], onChange, label, tipe, kapalId }) {
+export default function PalkaTableInput({ value = [], onChange, label, tipe, kapalId, isFixedPalka = true }) {
   const [lookupLoading, setLookupLoading] = useState({})
   const [justAddedId, setJustAddedId] = useState(null)
   const [calRange, setCalRange] = useState({ min: null, max: null, minSuhu: null, maxSuhu: null, count: 0 })
   const debounceTimers = useRef({})
 
   useEffect(() => {
-    if (value.length === 0) onChange([defaultRow(1)])
+    if (value.length === 0 && !isFixedPalka) onChange([defaultRow(1)])
   }, [])
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function PalkaTableInput({ value = [], onChange, label, tipe, kap
     setLookupLoading(prev => ({ ...prev, [idx]: true }))
     try {
       const [volRes, denRes] = await Promise.all([
-        lookupVolume({ tinggi: updated.tinggiCm, point: updated.point, kapalId }),
+        lookupVolume({ tinggi: updated.tinggiCm, point: updated.point, kapalId, namaPalka: updated.namaPalka }),
         lookupDensity({ suhu: updated.suhu, kapalId }),
       ])
       const finalUpdated = {
@@ -172,16 +172,18 @@ export default function PalkaTableInput({ value = [], onChange, label, tipe, kap
           </p>
         </div>
 
-        {/* Compact Add Button */}
-        <button
-          type="button"
-          onClick={addRow}
-          className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-primary-foreground bg-primary rounded-xl hover:bg-primary/90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0 select-none"
-          title="Tambah Baris Palka"
-        >
-          <Plus size={15} />
-          <span>Tambah Palka</span>
-        </button>
+        {/* Compact Add Button (Hanya tampil jika bukan palka konstan) */}
+        {!isFixedPalka && (
+          <button
+            type="button"
+            onClick={addRow}
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-primary-foreground bg-primary rounded-xl hover:bg-primary/90 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0 select-none"
+            title="Tambah Baris Palka"
+          >
+            <Plus size={15} />
+            <span>Tambah Palka</span>
+          </button>
+        )}
       </div>
 
       {/* Palka Cards List */}
@@ -229,24 +231,37 @@ export default function PalkaTableInput({ value = [], onChange, label, tipe, kap
                     {idx + 1}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <input
-                      type="text"
-                      value={row.namaPalka}
-                      onChange={(e) => update(idx, 'namaPalka', e.target.value)}
-                      placeholder="Nama Palka"
-                      className="w-full h-8 sm:h-9 px-2.5 bg-secondary/50 border border-border/70 rounded-xl text-xs sm:text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
-                    />
+                    {isFixedPalka ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground text-sm tracking-wide">
+                          {row.namaPalka}
+                        </span>
+                        <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground bg-secondary/80 px-2 py-0.5 rounded-md border border-border/60">
+                          Palka Tetap
+                        </span>
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={row.namaPalka}
+                        onChange={(e) => update(idx, 'namaPalka', e.target.value)}
+                        placeholder="Nama Palka"
+                        className="w-full h-8 sm:h-9 px-2.5 bg-secondary/50 border border-border/70 rounded-xl text-xs sm:text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+                      />
+                    )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeRow(idx)}
-                  disabled={value.length <= 1}
-                  className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 active:scale-90 disabled:opacity-20 transition-all ml-2 cursor-pointer"
-                  title="Hapus palka ini"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {!isFixedPalka && (
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    disabled={value.length <= 1}
+                    className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 active:scale-90 disabled:opacity-20 transition-all ml-2 cursor-pointer"
+                    title="Hapus palka ini"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
 
               {/* Input Fields Grid (2 Columns on Mobile & Desktop) */}

@@ -37,7 +37,34 @@ export default function PengirimanFormPage() {
     nilaiBl: '',
     satuanBl: 'KG',
   })
-  const [palkaBerangkat, setPalkaBerangkat] = useState([defaultRow(1)])
+  const [palkaBerangkat, setPalkaBerangkat] = useState([])
+
+  const handleKapalSelect = (newKapalId) => {
+    setForm(f => ({ ...f, kapalId: newKapalId }))
+    if (!newKapalId) return
+
+    const selected = kapalList.find(k => k.id === parseInt(newKapalId))
+    const pList = selected?.palkaList || selected?.palkaKapal || []
+    if (pList.length > 0) {
+      const rows = pList.map((pk) => {
+        const existing = palkaBerangkat.find(pb => pb.namaPalka?.toUpperCase() === pk.namaPalka?.toUpperCase())
+        if (existing) {
+          return { ...existing, namaPalka: pk.namaPalka }
+        }
+        return {
+          _id: Math.random().toString(36).slice(2) + Date.now(),
+          namaPalka: pk.namaPalka,
+          volumeLiter: '',
+          density: '',
+          faktorKoreksi: '1.000000',
+          tinggiCm: '',
+          point: '',
+          suhu: '',
+        }
+      })
+      setPalkaBerangkat(rows)
+    }
+  }
 
   useEffect(() => {
     if (user && !['ADMIN', 'PETUGAS'].includes(user?.role)) {
@@ -45,7 +72,29 @@ export default function PengirimanFormPage() {
       navigate('/pengiriman', { replace: true })
       return
     }
-    getKapal().then(r => setKapalList(r.data)).catch(console.error)
+    getKapal().then(r => {
+      setKapalList(r.data)
+      // Jika create baru dan ada kapal pertama, atau form kapalId sudah ada
+      if (!isEdit && r.data?.length > 0) {
+        const defaultKapal = r.data.find(k => k.isAktif !== false) || r.data[0]
+        if (defaultKapal) {
+          setForm(f => ({ ...f, kapalId: defaultKapal.id }))
+          const pList = defaultKapal.palkaList || defaultKapal.palkaKapal || []
+          if (pList.length > 0) {
+            setPalkaBerangkat(pList.map(pk => ({
+              _id: Math.random().toString(36).slice(2) + Date.now(),
+              namaPalka: pk.namaPalka,
+              volumeLiter: '',
+              density: '',
+              faktorKoreksi: '1.000000',
+              tinggiCm: '',
+              point: '',
+              suhu: '',
+            })))
+          }
+        }
+      }
+    }).catch(console.error)
     if (isEdit) {
       setLoading(true)
       getPengirimanById(id).then(r => {
@@ -187,7 +236,7 @@ export default function PengirimanFormPage() {
               <label className={labelCls}>Kapal <span className="text-red-400">*</span></label>
               <CustomSelect
                 value={form.kapalId}
-                onChange={(val) => setForm(f => ({ ...f, kapalId: val }))}
+                onChange={handleKapalSelect}
                 options={kapalList.filter(k => k.isAktif !== false || k.id === form.kapalId).map(k => ({ value: k.id, label: k.namaKapal }))}
                 placeholder="-- Pilih Kapal --"
                 icon={Ship}
@@ -242,6 +291,7 @@ export default function PengirimanFormPage() {
             value={palkaBerangkat}
             onChange={setPalkaBerangkat}
             kapalId={form.kapalId}
+            isFixedPalka={true}
           />
         </div>
 

@@ -296,6 +296,7 @@ export default function PengirimanKedatanganPage() {
             value={palkaDatang}
             onChange={setPalkaDatang}
             kapalId={data.kapalId}
+            isFixedPalka={true}
           />
         </div>
 

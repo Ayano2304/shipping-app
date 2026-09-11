@@ -140,4 +140,16 @@ export const deleteNotifikasi = (id) => api.delete(`/notifikasi/${id}`)
 export const createSounding = (data) => api.post('/masterdata/sounding', data)
 export const updateSounding = (id, data) => api.put(`/masterdata/sounding/${id}`, data)
 export const deleteSounding = (id) => api.delete(`/masterdata/sounding/${id}`)
+
+// Master Density CRUD
+export const createDensity = (data) => api.post('/masterdata/density', data)
+export const updateDensity = (id, data) => api.put(`/masterdata/density/${id}`, data)
+export const deleteDensity = (id) => api.delete(`/masterdata/density/${id}`)
+
+// Master Palka Kapal CRUD
+export const getPalkaKapal = (kapalId) => api.get(`/masterdata/kapal/${kapalId}/palka`)
+export const createPalkaKapal = (kapalId, data) => api.post(`/masterdata/kapal/${kapalId}/palka`, data)
+export const updatePalkaKapal = (id, data) => api.put(`/masterdata/palka/${id}`, data)
+export const deletePalkaKapal = (id) => api.delete(`/masterdata/palka/${id}`)
+
 export const exportPDF = (id) => api.get(`/export/pengiriman/${id}/pdf`, { responseType: 'blob' })

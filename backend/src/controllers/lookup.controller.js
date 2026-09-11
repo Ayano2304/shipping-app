@@ -1,25 +1,55 @@
 const prisma = require('../lib/prisma');
 
-// GET /api/lookup/volume?kapalId=1&tinggi=211&point=0.5
+// GET /api/lookup/volume?kapalId=1&tinggi=211&point=0.5&namaPalka=PALKA%201%20P
 exports.lookupVolume = async (req, res) => {
   try {
-    const { kapalId, tinggi, point } = req.query;
+    const { kapalId, tinggi, point, namaPalka } = req.query;
     
     if (!kapalId || !tinggi) {
       return res.status(400).json({ error: 'kapalId dan tinggi wajib diisi' });
     }
 
+    const kapalIdInt = parseInt(kapalId);
     const tinggiInt = parseInt(tinggi);
     const pointDecimal = parseFloat(point || 0);
 
-    // Cari data di sounding table
-    const data = await prisma.soundingTable.findFirst({
-      where: { kapalId: parseInt(kapalId), tinggiCm: tinggiInt }
-    });
+    let data = null;
+
+    // Jika namaPalka dikirim, coba cari spesifik palka terlebih dahulu
+    if (namaPalka && typeof namaPalka === 'string' && namaPalka.trim()) {
+      const cleanNama = namaPalka.trim();
+      // 1. Coba exact case-insensitive match
+      data = await prisma.soundingTable.findFirst({
+        where: {
+          kapalId: kapalIdInt,
+          tinggiCm: tinggiInt,
+          namaPalka: { equals: cleanNama, mode: 'insensitive' }
+        }
+      });
+
+      // 2. Jika belum ketemu, coba normalisasi format misal '1P' match 'PALKA 1 P'
+      if (!data) {
+        const compact = cleanNama.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const allPalkaRows = await prisma.soundingTable.findMany({
+          where: { kapalId: kapalIdInt, tinggiCm: tinggiInt }
+        });
+        data = allPalkaRows.find(r => {
+          const rCompact = (r.namaPalka || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          return rCompact === compact || rCompact.endsWith(compact) || compact.endsWith(rCompact);
+        });
+      }
+    }
+
+    // 3. Fallback jika masih belum ketemu atau namaPalka tidak dikirim
+    if (!data) {
+      data = await prisma.soundingTable.findFirst({
+        where: { kapalId: kapalIdInt, tinggiCm: tinggiInt }
+      });
+    }
 
     if (!data) {
       return res.status(404).json({ 
-        error: `Data sounding tidak ditemukan untuk kapal ini pada tinggi ${tinggiInt}cm` 
+        error: `Data sounding tidak ditemukan untuk kapal ini pada tinggi ${tinggiInt}cm${namaPalka ? ` (${namaPalka})` : ''}` 
       });
     }
 
@@ -33,7 +63,8 @@ exports.lookupVolume = async (req, res) => {
       volumeBase: parseFloat(volumeBase.toFixed(4)),
       bedaLiter: parseFloat(bedaLiter.toFixed(4)),
       tinggiCm: tinggiInt, 
-      point: pointDecimal
+      point: pointDecimal,
+      namaPalka: data.namaPalka || ''
     });
   } catch (err) {
     console.error('Lookup volume error:', err);

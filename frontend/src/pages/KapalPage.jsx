@@ -3,9 +3,10 @@ import { getKapal, createKapal, updateKapal, deleteKapal, importExcel, downloadK
 import toast from 'react-hot-toast'
 import { 
   Ship, Plus, Pencil, Trash2, Loader2, X, Check, Upload, Download, 
-  FileSpreadsheet, CheckCircle2, AlertCircle, Truck, Calendar, ChevronRight, MoreVertical 
+  FileSpreadsheet, CheckCircle2, AlertCircle, Truck, Calendar, ChevronRight, MoreVertical, Sliders 
 } from 'lucide-react'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import KalibrasiKapalModal from '../components/kapal/KalibrasiKapalModal'
 import { Navigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
@@ -15,6 +16,7 @@ export default function KapalPage() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // null | { mode: 'add'|'edit', data? }
   const [uploadModal, setUploadModal] = useState(null) // null | { kapal }
+  const [kalibrasiModal, setKalibrasiModal] = useState(null) // null | { kapal }
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
@@ -250,6 +252,7 @@ export default function KapalPage() {
                                 Terkalibrasi
                               </span>
                               <div className="text-xs text-muted-foreground space-y-1">
+                                <div>Palka Tetap: <span className="font-bold text-foreground">{k.palkaList?.length || k._count?.palkaKapal || 0} kompartemen</span></div>
                                 <div>Sounding: <span className="font-bold text-foreground">{kal.soundingCount} baris</span> ({kal.minTinggi}–{kal.maxTinggi} cm)</div>
                                 <div>Density: <span className="font-bold text-foreground">{kal.densityCount} baris</span> ({kal.minSuhu}–{kal.maxSuhu} °C)</div>
                               </div>
@@ -289,12 +292,20 @@ export default function KapalPage() {
                         <td className="px-6 py-5 align-top text-right">
                           <div className="flex items-center justify-end gap-2 pt-1">
                             <button
+                              onClick={() => setKalibrasiModal({ kapal: k })}
+                              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer shadow-xs active:scale-95"
+                              title="Lihat & Kelola Kalibrasi Kapal (Sounding, Density, Palka)"
+                            >
+                              <Sliders size={14} />
+                              <span>Kelola Kalibrasi</span>
+                            </button>
+                            <button
                               onClick={() => openUpload(k)}
                               className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all cursor-pointer shadow-xs active:scale-95"
                               title="Upload file kalibrasi Excel untuk kapal ini"
                             >
                               <Upload size={14} />
-                              <span>Upload Kalibrasi</span>
+                              <span>Upload Excel</span>
                             </button>
                             <button
                               onClick={() => openEdit(k)}
@@ -380,6 +391,7 @@ export default function KapalPage() {
                       </div>
                       {isCalibrated ? (
                         <div className="text-xs text-muted-foreground space-y-0.5">
+                          <div>Palka Tetap: <span className="font-bold text-foreground">{k.palkaList?.length || k._count?.palkaKapal || 0} kompartemen</span></div>
                           <div>Sounding: <span className="font-bold text-foreground">{kal.soundingCount} baris</span> ({kal.minTinggi}–{kal.maxTinggi} cm)</div>
                           <div>Density: <span className="font-bold text-foreground">{kal.densityCount} baris</span> ({kal.minSuhu}–{kal.maxSuhu} °C)</div>
                         </div>
@@ -404,14 +416,23 @@ export default function KapalPage() {
                       </Link>
                     </div>
 
-                    {/* Upload Kalibrasi Button */}
-                    <button
-                      onClick={() => openUpload(k)}
-                      className="w-full py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs active:scale-95"
-                    >
-                      <Upload size={14} />
-                      <span>Upload Kalibrasi</span>
-                    </button>
+                    {/* Action Buttons: Kelola & Upload Kalibrasi */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setKalibrasiModal({ kapal: k })}
+                        className="w-full py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs active:scale-95"
+                      >
+                        <Sliders size={13} />
+                        <span>Kelola Kalibrasi</span>
+                      </button>
+                      <button
+                        onClick={() => openUpload(k)}
+                        className="w-full py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs active:scale-95"
+                      >
+                        <Upload size={13} />
+                        <span>Upload Excel</span>
+                      </button>
+                    </div>
 
                     {/* Edit & Hapus Buttons */}
                     <div className="flex items-center gap-2">
@@ -651,6 +672,19 @@ export default function KapalPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Kelola Kalibrasi Kapal */}
+      {kalibrasiModal && (
+        <KalibrasiKapalModal
+          kapal={kalibrasiModal.kapal}
+          onClose={() => setKalibrasiModal(null)}
+          onOpenUpload={(k) => {
+            setKalibrasiModal(null)
+            openUpload(k)
+          }}
+          onRefreshKapal={load}
+        />
       )}
     </div>
   )

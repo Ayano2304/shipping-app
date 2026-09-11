@@ -11,7 +11,10 @@ exports.getAll = async (req, res) => {
     const kapal = await prisma.kapal.findMany({
       where,
       orderBy: { namaKapal: 'asc' },
-      include: { _count: { select: { pengiriman: true, soundingTable: true, densityTable: true } } }
+      include: { 
+        palkaKapal: { orderBy: { urutan: 'asc' } },
+        _count: { select: { pengiriman: true, soundingTable: true, densityTable: true, palkaKapal: true } } 
+      }
     });
 
     // Ambil agregasi rentang sounding dan density per kapal
@@ -36,9 +39,11 @@ exports.getAll = async (req, res) => {
       const d = densityMap.get(k.id);
       const soundingCount = k._count?.soundingTable || 0;
       const densityCount = k._count?.densityTable || 0;
+      const palkaCount = k._count?.palkaKapal || 0;
 
       return {
         ...k,
+        palkaList: k.palkaKapal || [],
         kalibrasi: {
           isCalibrated: soundingCount > 0 && densityCount > 0,
           soundingCount,
@@ -47,6 +52,7 @@ exports.getAll = async (req, res) => {
           densityCount,
           minSuhu: d?._min?.suhu ?? null,
           maxSuhu: d?._max?.suhu ?? null,
+          palkaCount,
         }
       };
     });
@@ -62,7 +68,10 @@ exports.getById = async (req, res) => {
   try {
     const kapal = await prisma.kapal.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { pengiriman: { orderBy: { createdAt: 'desc' }, take: 5 } }
+      include: { 
+        palkaKapal: { orderBy: { urutan: 'asc' } },
+        pengiriman: { orderBy: { createdAt: 'desc' }, take: 5 } 
+      }
     });
     if (!kapal) return res.status(404).json({ error: 'Kapal tidak ditemukan.' });
     res.json(kapal);
